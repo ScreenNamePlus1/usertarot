@@ -1,0 +1,41 @@
+# Import random and PIL modules
+import random
+from PIL import Image
+
+# Define the suits and ranks of the tarot cards
+suits = ["Wands", "Cups", "Swords", "Pentacles"]
+ranks = ["Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Page", "Knight", "Queen", "King"]
+major_arcana = ["The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor", "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit", "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance", "The Devil", "The Tower", "The Star", "The Moon", "The Sun", "Judgement", "The World"]
+
+# Create a list of all the tarot cards
+tarot_cards = []
+
+# Add the minor arcana cards
+for suit in suits:
+  for rank in ranks:
+    tarot_cards.append(rank + " of " + suit)
+
+# Add the major arcana cards
+tarot_cards.extend(major_arcana)
+
+# Pick one random tarot card
+random_card = random.choice(tarot_cards)
+
+# Pick a random orientation
+orientation = random.choice(["Upright", "Reversed"])
+
+# Print the random tarot card and its orientation
+print("The random tarot card is:")
+print(random_card + " (" + orientation + ")")
+
+# Open the image file corresponding to the random card
+# You need to have the images named as the cards in your project folder
+# Or you can use a web URL instead of the file name
+image = Image.open(random_card + ".jpg")
+
+# If the orientation is reversed, flip the image vertically
+if orientation == "Reversed":
+  image = image.transpose(Image.FLIP_TOP_BOTTOM)
+
+# Display the image
+image.show()
