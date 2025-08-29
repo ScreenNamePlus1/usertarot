@@ -1,0 +1,53 @@
+name: Build Kivy APK
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Buildozer dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git zip unzip python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev automake
+          pip install --user --upgrade cython virtualenv
+          pip install --user --upgrade buildozer
+          echo 'export PATH=$PATH:~/.local/bin/' >> ~/.bashrc
+
+      - name: Set up Java
+        run: |
+          sudo apt install -y openjdk-17-jdk
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          sudo update-java-alternatives --set java-1.17.0-openjdk-amd64
+          export PATH=$JAVA_HOME/bin:$PATH
+
+      - name: Cache Buildozer global directory
+        uses: actions/cache@v4
+        with:
+          path: .buildozer-global
+          key: buildozer-global-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+
+      - name: Build with Buildozer
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
+        with:
+          workdir: .
+          buildozer_version: stable
+          command: buildozer -v android debug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarot-app-apk
+          path: ${{ steps.buildozer.outputs.filename }}
