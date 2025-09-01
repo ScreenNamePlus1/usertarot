@@ -61,8 +61,8 @@ class GlassButton(Button):
         with self.canvas.before:
             # Subtle glow effect
             Color(0.85, 0.75, 0.9, 0.5) # Light purple, semi-transparent
-            RoundedRectangle(pos=(self.pos[0] - 2, self.pos[1] - 2), 
-                             size=(self.size[0] + 4, self.size[1] + 4), 
+            RoundedRectangle(pos=(self.pos[0] - 2, self.pos[1] - 2),
+                             size=(self.size[0] + 4, self.size[1] + 4),
                              radius=[22,])
             # Solid button color
             Color(0.65, 0.45, 0.8, 1) # A slightly darker, solid purple
@@ -81,11 +81,14 @@ class TarotApp(App):
         # Empty spacer to push the button down
         main_layout.add_widget(Label(size_hint_y=1))
 
-        # "Single Card Draw" button with a purple fairy theme
-        single_card_button = GlassButton(
+        # The "Single Card Draw" button is a regular button using the card back image
+        single_card_button = Button(
             text="Single Card Draw",
             size_hint=(0.8, 0.2),
             pos_hint={'center_x': 0.5},
+            background_normal='images/images/CardBacks.jpg',
+            background_down='images/images/CardBacks.jpg',
+            color=(1, 1, 1, 1)
         )
         single_card_button.bind(on_press=self.draw_single_card)
         main_layout.add_widget(single_card_button)
