@@ -47,6 +47,27 @@ def get_card_image(card_name, orientation):
     except FileNotFoundError:
         return 'images/images/CardBacks.jpg', True
 
+# Custom button class for rounded corners and glass effect
+class GlassButton(Button):
+    def __init__(self, **kwargs):
+        super(GlassButton, self).__init__(**kwargs)
+        self.background_normal = ''
+        self.background_down = ''
+        self.bind(pos=self.update_canvas, size=self.update_canvas)
+        self.update_canvas()
+
+    def update_canvas(self, *args):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            # Subtle glow effect
+            Color(0.85, 0.75, 0.9, 0.5) # Light purple, semi-transparent
+            RoundedRectangle(pos=(self.pos[0] - 2, self.pos[1] - 2), 
+                             size=(self.size[0] + 4, self.size[1] + 4), 
+                             radius=[22,])
+            # Solid button color
+            Color(0.65, 0.45, 0.8, 1) # A slightly darker, solid purple
+            RoundedRectangle(pos=self.pos, size=self.size, radius=[20,])
+
 class TarotApp(App):
     def build(self):
         self.sm = ScreenManager()
@@ -57,16 +78,20 @@ class TarotApp(App):
 
         main_layout.add_widget(Label(text="Select a Tarot Configuration", font_size='20sp', size_hint_y=0.1))
 
-        # The "Single Card Draw" button now uses the card back image
-        single_card_button = Button(
+        # Empty spacer to push the button down
+        main_layout.add_widget(Label(size_hint_y=1))
+
+        # "Single Card Draw" button with a purple fairy theme
+        single_card_button = GlassButton(
             text="Single Card Draw",
             size_hint=(0.8, 0.2),
             pos_hint={'center_x': 0.5},
-            background_normal='images/images/CardBacks.jpg',
-            background_down='images/images/CardBacks.jpg'
         )
         single_card_button.bind(on_press=self.draw_single_card)
         main_layout.add_widget(single_card_button)
+
+        # Empty spacer to push the button up
+        main_layout.add_widget(Label(size_hint_y=1))
 
         main_screen.add_widget(main_layout)
         self.sm.add_widget(main_screen)
@@ -78,21 +103,7 @@ class TarotApp(App):
         self.card_label = Label(text="Click to reveal your card", font_size='24sp', size_hint_y=0.1)
         self.card_image = Image(source='images/images/CardBacks.jpg', size_hint=(0.8, 0.8), pos_hint={'center_x': 0.5})
 
-        # The "Reveal Card" and "Go Back" buttons with purple, shiny glass-like style
-        class GlassButton(Button):
-            def __init__(self, **kwargs):
-                super(GlassButton, self).__init__(**kwargs)
-                self.background_normal = ''
-                self.background_down = ''
-                self.bind(pos=self.update_canvas, size=self.update_canvas)
-                self.update_canvas()
-
-            def update_canvas(self, *args):
-                self.canvas.before.clear()
-                with self.canvas.before:
-                    Color(0.5, 0, 0.5, 1) # Purple
-                    RoundedRectangle(pos=self.pos, size=self.size, radius=[20,])
-
+        # "Reveal Card" button with the purple fairy theme
         reveal_button = GlassButton(
             text="Reveal Card",
             size_hint=(0.5, 0.1),
@@ -100,6 +111,7 @@ class TarotApp(App):
         )
         reveal_button.bind(on_press=self.draw_single_card)
 
+        # "Go Back" button with the purple fairy theme
         back_button = GlassButton(
             text="Go Back",
             size_hint=(0.5, 0.1),
