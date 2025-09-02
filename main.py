@@ -9,6 +9,9 @@ from kivy.graphics import Color, RoundedRectangle
 from PIL import Image as PilImage
 import os
 
+# Set the window background color to black
+Window.clearcolor = (0, 0, 0, 1)
+
 # Define the suits and ranks of the tarot cards
 suits = ["Wands", "Cups", "Swords", "Pentacles"]
 ranks = ["Ace", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Page", "Knight", "Queen", "King"]
