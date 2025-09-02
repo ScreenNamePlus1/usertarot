@@ -4,10 +4,10 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
-from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.core.window import Window
 from kivy.graphics import Color, RoundedRectangle
 from PIL import Image as PilImage
+import os
 
 # Define the suits and ranks of the tarot cards
 suits = ["Wands", "Cups", "Swords", "Pentacles"]
@@ -28,7 +28,6 @@ def get_card_image(card_name, orientation):
         "Ten of Cups": "Page_of_Cups",
         "Ten of Pentacles": "Page_of_Pentacles"
     }
-
     image_name = image_map.get(card_name, card_name)
     image_path = f'images/images/{image_name.replace(" ", "_")}.jpg'
 
@@ -70,83 +69,48 @@ class GlassButton(Button):
 
 class TarotApp(App):
     def build(self):
-        self.sm = ScreenManager()
-
-        # Main Screen
-        main_screen = Screen(name='main')
+        # Set up a single main layout
         main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        
+        # Add a title label
+        main_layout.add_widget(Label(text="Tarot Card Draw", font_size='24sp', size_hint_y=0.1))
 
-        main_layout.add_widget(Label(text="Select a Tarot Configuration", font_size='20sp', size_hint_y=0.1))
+        # Add the main card image, initially showing the card back
+        self.card_image = Image(source='images/images/CardBacks.jpg', size_hint=(0.8, 0.6), pos_hint={'center_x': 0.5})
+        main_layout.add_widget(self.card_image)
 
-        # Empty spacer to push the button down
-        main_layout.add_widget(Label(size_hint_y=1))
+        # Add a label to display the card name
+        self.card_label = Label(text="Click the button to reveal your card", font_size='18sp', size_hint_y=0.1)
+        main_layout.add_widget(self.card_label)
 
-        # The "Single Card Draw" button is a regular button using the card back image
-        single_card_button = Button(
-            text="Single Card Draw",
-            size_hint=(0.8, 0.2),
-            pos_hint={'center_x': 0.5},
-            background_normal='images/images/CardBacks.jpg',
-            background_down='images/images/CardBacks.jpg',
-            color=(1, 1, 1, 1)
-        )
-        single_card_button.bind(on_press=self.draw_single_card)
-        main_layout.add_widget(single_card_button)
-
-        # Empty spacer to push the button up
-        main_layout.add_widget(Label(size_hint_y=1))
-
-        main_screen.add_widget(main_layout)
-        self.sm.add_widget(main_screen)
-
-        # Draw Screen
-        self.draw_screen = Screen(name='draw')
-        self.draw_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-
-        self.card_label = Label(text="Click to reveal your card", font_size='24sp', size_hint_y=0.1)
-        self.card_image = Image(source='images/images/CardBacks.jpg', size_hint=(0.8, 0.8), pos_hint={'center_x': 0.5})
-
-        # "Reveal Card" button with the purple fairy theme
+        # Add a button to draw a new card. This is the only button needed.
         reveal_button = GlassButton(
-            text="Reveal Card",
-            size_hint=(0.5, 0.1),
+            text="Draw a Single Card",
+            size_hint=(0.7, 0.1),
             pos_hint={'center_x': 0.5}
         )
         reveal_button.bind(on_press=self.draw_single_card)
+        main_layout.add_widget(reveal_button)
 
-        # "Go Back" button with the purple fairy theme
-        back_button = GlassButton(
-            text="Go Back",
-            size_hint=(0.5, 0.1),
-            pos_hint={'center_x': 0.5}
-        )
-        back_button.bind(on_press=self.go_back)
-
-        self.draw_layout.add_widget(self.card_label)
-        self.draw_layout.add_widget(self.card_image)
-        self.draw_layout.add_widget(reveal_button)
-        self.draw_layout.add_widget(back_button)
-        self.draw_screen.add_widget(self.draw_layout)
-        self.sm.add_widget(self.draw_screen)
-
-        return self.sm
+        return main_layout
 
     def draw_single_card(self, instance):
+        # Select a random card and orientation
         random_card = random.choice(tarot_cards)
         orientation = random.choice(["Upright", "Reversed"])
 
+        # Get the correct image path
         image_path, is_missing = get_card_image(random_card, orientation)
-        self.card_label.text = f"{random_card} ({orientation})" if not is_missing else f"{random_card} ({orientation}) - Image Missing"
+
+        # Update the card image source and the label text on the same screen
         self.card_image.source = image_path
-        self.card_image.reload()
+        self.card_image.reload() # Force a reload to show the new image
 
-        self.sm.current = 'draw'
-
-    def go_back(self, instance):
-        self.card_label.text = "Click to reveal your card"
-        self.card_image.source = 'images/images/CardBacks.jpg'
-        self.card_image.reload()
-        self.sm.current = 'main'
+        # Update the label with the card name and orientation
+        if is_missing:
+            self.card_label.text = f"{random_card} ({orientation}) - Image Missing"
+        else:
+            self.card_label.text = f"{random_card} ({orientation})"
 
 if __name__ == '__main__':
     TarotApp().run()
