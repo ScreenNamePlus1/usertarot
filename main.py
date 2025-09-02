@@ -51,19 +51,25 @@ class TarotApp(App):
     def build(self):
         # Set up a single main layout
         main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
-        
+
         # Add a title label
-        main_layout.add_widget(Label(text="Tarot Card Draw", font_size='24sp', size_hint_y=0.1))
+        main_layout.add_widget(Label(text="Tap to Draw", font_size='24sp', size_hint_y=0.1))
 
         # Add the main card image, initially showing the card back
-        self.card_image = Image(source='images/images/CardBacks.jpg', size_hint=(0.8, 0.6), pos_hint={'center_x': 0.5})
+        self.card_image = Image(
+            source='images/images/CardBacks.jpg',
+            size_hint=(0.9, 0.8),  # Adjust this to control the size
+            pos_hint={'center_x': 0.5},
+            allow_stretch=True,  # Allows the image to stretch
+            keep_ratio=True  # Maintains the image's original aspect ratio
+        )
         main_layout.add_widget(self.card_image)
 
         # Bind the touch event directly to the card image
         self.card_image.bind(on_touch_down=self.on_card_tap)
 
         # Add a label to display the card name
-        self.card_label = Label(text="Tap the card to reveal your destiny", font_size='18sp', size_hint_y=0.1)
+        self.card_label = Label(text="Tap the card to reveal your destiny", font_size='24sp', size_hint_y=0.1)
         main_layout.add_widget(self.card_label)
 
         return main_layout
