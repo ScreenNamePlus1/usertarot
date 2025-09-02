@@ -1,11 +1,9 @@
 import random
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
 from kivy.uix.image import Image
 from kivy.uix.label import Label
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle
 from PIL import Image as PilImage
 import os
 
@@ -49,27 +47,6 @@ def get_card_image(card_name, orientation):
     except FileNotFoundError:
         return 'images/images/CardBacks.jpg', True
 
-# Custom button class for rounded corners and glass effect
-class GlassButton(Button):
-    def __init__(self, **kwargs):
-        super(GlassButton, self).__init__(**kwargs)
-        self.background_normal = ''
-        self.background_down = ''
-        self.bind(pos=self.update_canvas, size=self.update_canvas)
-        self.update_canvas()
-
-    def update_canvas(self, *args):
-        self.canvas.before.clear()
-        with self.canvas.before:
-            # Subtle glow effect
-            Color(0.85, 0.75, 0.9, 0.5) # Light purple, semi-transparent
-            RoundedRectangle(pos=(self.pos[0] - 2, self.pos[1] - 2),
-                             size=(self.size[0] + 4, self.size[1] + 4),
-                             radius=[22,])
-            # Solid button color
-            Color(0.65, 0.45, 0.8, 1) # A slightly darker, solid purple
-            RoundedRectangle(pos=self.pos, size=self.size, radius=[20,])
-
 class TarotApp(App):
     def build(self):
         # Set up a single main layout
@@ -82,22 +59,21 @@ class TarotApp(App):
         self.card_image = Image(source='images/images/CardBacks.jpg', size_hint=(0.8, 0.6), pos_hint={'center_x': 0.5})
         main_layout.add_widget(self.card_image)
 
+        # Bind the touch event directly to the card image
+        self.card_image.bind(on_touch_down=self.on_card_tap)
+
         # Add a label to display the card name
-        self.card_label = Label(text="Click the button to reveal your card", font_size='18sp', size_hint_y=0.1)
+        self.card_label = Label(text="Tap the card to reveal your destiny", font_size='18sp', size_hint_y=0.1)
         main_layout.add_widget(self.card_label)
 
-        # Add a button to draw a new card. This is the only button needed.
-        reveal_button = GlassButton(
-            text="Draw a Single Card",
-            size_hint=(0.7, 0.1),
-            pos_hint={'center_x': 0.5}
-        )
-        reveal_button.bind(on_press=self.draw_single_card)
-        main_layout.add_widget(reveal_button)
-
         return main_layout
+    
+    def on_card_tap(self, instance, touch):
+        # Check if the touch is within the bounds of the image
+        if instance.collide_point(*touch.pos):
+            self.draw_single_card()
 
-    def draw_single_card(self, instance):
+    def draw_single_card(self):
         # Select a random card and orientation
         random_card = random.choice(tarot_cards)
         orientation = random.choice(["Upright", "Reversed"])
