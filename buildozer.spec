@@ -5,7 +5,7 @@ package.domain = org.example
 version = 1.0
 
 # Simplified requirements - remove pillow to avoid libffi issues
-requirements = python3,kivy==2.2.2
+requirements = python3,kivy==2.3.0  # Updated to latest stable Kivy
 
 # Source configuration
 source.dir = .
@@ -18,14 +18,14 @@ fullscreen = 1
 
 # Android specific - using more stable API/NDK versions
 android.entrypoint = org.kivy.android.PythonActivity
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE
-android.api = 30
+android.permissions = INTERNET  # Removed READ_EXTERNAL_STORAGE as images are bundled in APK
+android.api = 34  # Updated to Android 14 for better compatibility
 android.minapi = 21
-android.ndk = 23c
+android.ndk = r27d  # Latest LTS NDK for 64-bit support
 android.accept_sdk_license = True
 
-# Use only one architecture to avoid build complexity
-android.archs = armeabi-v7a
+# Support both 32-bit and 64-bit architectures
+android.archs = armeabi-v7a,arm64-v8a
 
 # Disable problematic features
 android.gradle_dependencies = 
