@@ -30,11 +30,11 @@ jobs:
           sudo apt install -y openjdk-17-jdk
           echo 'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64' >> $GITHUB_ENV
           sudo update-java-alternatives --set java-1.17.0-openjdk-amd64
-          echo '/usr/lib/jvm/java-17-openjdk-amd64/bin' >> $GITHUB_ENV
+          echo 'PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH' >> $GITHUB_ENV
 
       - name: Clean previous build
         run: buildozer android clean
-      
+
       - name: Build the APK
         run: buildozer -v android debug
 
