@@ -9,6 +9,8 @@ import os
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.clock import Clock
+from kivy.core.image import Image as CoreImage
+from io import BytesIO
 
 # Set the window background color to black
 Window.clearcolor = (0, 0, 0, 1)
@@ -27,103 +29,222 @@ for suit in suits:
         tarot_cards.append(f"{rank} of {suit}")
 tarot_cards.extend(major_arcana)
 
-# Helper function to get the image path and handle flipping without temporary files
-def get_card_image(card_name, orientation):
-    formatted_name = card_name.replace(" ", "_").replace("The_", "")
-    if card_name.startswith("The"):
-        formatted_name = card_name.replace(" ", "_")
-
-    # Check for card back as fallback
-    if formatted_name == "CardBacks":
-        if os.path.exists('rider-waite-tarot/CardBacks.png'):
-            return 'rider-waite-tarot/CardBacks.png', False
-        elif os.path.exists('rider-waite-tarot/CardBacks.jpg'):
-            return 'rider-waite-tarot/CardBacks.jpg', False
-        return None, True
-
-    image_path = f'rider-waite-tarot/{formatted_name}.png'
-    if not os.path.exists(image_path) and os.path.exists(f'rider-waite-tarot/{formatted_name}.jpg'):
-        image_path = f'rider-waite-tarot/{formatted_name}.jpg'
-
-    if orientation == "Reversed":
-        try:
-            with PilImage.open(image_path) as pil_img:
-                flipped_img = pil_img.transpose(PilImage.ROTATE_180)
-                # Convert PIL image to Kivy-compatible format in memory
-                from io import BytesIO
-                buf = BytesIO()
-                flipped_img.save(buf, format='PNG')
-                buf.seek(0)
-                return buf, False
-        except (FileNotFoundError, Exception):
-            return get_card_image("CardBacks", "Upright")[0], True
-    try:
-        with PilImage.open(image_path):
-            return image_path, False
-    except (FileNotFoundError, Exception):
-        return get_card_image("CardBacks", "Upright")[0], True
-
 class TarotApp(App):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.image_cache = {}  # Cache for processed images
+        
     def build(self):
-        # Set the application icon to CardBacks.jpg
-        self.icon = 'rider-waite-tarot/CardBacks.jpg'
+        # Set the application icon - check multiple possible paths
+        icon_paths = [
+            'images/rider-waite-tarot/CardBacks.jpg',
+            'images/rider-waite-tarot/CardBacks.png',
+            'rider-waite-tarot/CardBacks.jpg',
+            'rider-waite-tarot/CardBacks.png'
+        ]
+        
+        for path in icon_paths:
+            if os.path.exists(path):
+                self.icon = path
+                break
 
         self.main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
         self.show_spread_selection()
         return self.main_layout
 
-    def show_spread_selection(self):
-        self.main_layout.clear_widgets()
-        self.main_layout.add_widget(Label(text="Select a Tarot Spread", font_size='24sp', size_hint_y=0.1))
+    def get_image_base_path(self):
+        """Determine the correct base path for images"""
+        possible_paths = [
+            'images/rider-waite-tarot/',
+            'rider-waite-tarot/',
+            'images/',
+            ''
+        ]
+        
+        for path in possible_paths:
+            if os.path.exists(f"{path}CardBacks.png") or os.path.exists(f"{path}CardBacks.jpg"):
+                return path
+        return 'images/rider-waite-tarot/'  # Default fallback
 
-        spreads_grid = GridLayout(cols=3, spacing=10)
+    def get_card_image_path(self, card_name, orientation="Upright"):
+        """Get the correct image path for a card with improved error handling"""
+        base_path = self.get_image_base_path()
+        
+        # Format the card name for file lookup
+        formatted_name = card_name.replace(" ", "_")
+        if card_name.startswith("The "):
+            formatted_name = card_name.replace(" ", "_")
+        else:
+            formatted_name = card_name.replace(" ", "_").replace("The_", "")
+
+        # Handle card back as special case
+        if formatted_name == "CardBacks" or card_name == "CardBacks":
+            for ext in ['.png', '.jpg', '.jpeg']:
+                path = f'{base_path}CardBacks{ext}'
+                if os.path.exists(path):
+                    return path, False
+            return None, True
+
+        # Try different file extensions
+        for ext in ['.png', '.jpg', '.jpeg']:
+            image_path = f'{base_path}{formatted_name}{ext}'
+            if os.path.exists(image_path):
+                if orientation == "Upright":
+                    return image_path, False
+                else:
+                    # Return reversed version
+                    return self.create_reversed_image(image_path), False
+        
+        # Fallback to card back
+        return self.get_card_image_path("CardBacks", "Upright")
+
+    def create_reversed_image(self, image_path):
+        """Create a reversed image and cache it"""
+        cache_key = f"{image_path}_reversed"
+        
+        if cache_key in self.image_cache:
+            return self.image_cache[cache_key]
+        
+        try:
+            with PilImage.open(image_path) as pil_img:
+                # Rotate 180 degrees for reversed
+                flipped_img = pil_img.transpose(PilImage.ROTATE_180)
+                
+                # Convert to bytes
+                buf = BytesIO()
+                flipped_img.save(buf, format='PNG')
+                buf.seek(0)
+                
+                # Create Kivy CoreImage from bytes
+                core_image = CoreImage(buf, ext='png')
+                self.image_cache[cache_key] = core_image
+                return core_image
+                
+        except Exception as e:
+            print(f"Error creating reversed image for {image_path}: {e}")
+            # Return card back as fallback
+            return self.get_card_image_path("CardBacks", "Upright")[0]
+
+    def get_card_back_path(self):
+        """Get the path to the card back image"""
+        base_path = self.get_image_base_path()
+        for ext in ['.png', '.jpg', '.jpeg']:
+            path = f'{base_path}CardBacks{ext}'
+            if os.path.exists(path):
+                return path
+        return None
+
+    def show_spread_selection(self):
+        """Display the spread selection screen"""
+        self.main_layout.clear_widgets()
+        
+        # Title
+        title = Label(
+            text="Select a Tarot Spread", 
+            font_size='24sp', 
+            size_hint_y=0.15,
+            color=(1, 1, 1, 1)
+        )
+        self.main_layout.add_widget(title)
+
+        # Spreads grid
+        spreads_grid = GridLayout(cols=2, spacing=15, size_hint_y=0.85)
 
         spread_options = {
-            "Single Card": 1,
-            "Three-Card": 3,
-            "Five-Card": 5,
-            "Seven-Card": 7,
-            "Celtic Cross": 10,
-            "The Cross": 2
+            "Single Card": {"cards": 1, "description": "Focus on one question"},
+            "Three-Card": {"cards": 3, "description": "Past, Present, Future"},
+            "Five-Card": {"cards": 5, "description": "Detailed insight"},
+            "Seven-Card": {"cards": 7, "description": "Weekly guidance"},
+            "Celtic Cross": {"cards": 10, "description": "Complete reading"},
+            "The Cross": {"cards": 2, "description": "Simple yes/no"}
         }
 
-        for name, num_cards in spread_options.items():
-            spread_button = BoxLayout(orientation='vertical', size_hint_y=None, height=150)
+        card_back_path = self.get_card_back_path()
 
+        for name, info in spread_options.items():
+            spread_container = BoxLayout(orientation='vertical', spacing=5)
+
+            # Card image button
             card_button = Button(
-                background_normal=get_card_image("CardBacks", "Upright")[0],
-                background_down=get_card_image("CardBacks", "Upright")[0],
+                background_normal=card_back_path or '',
+                background_down=card_back_path or '',
                 background_color=(1, 1, 1, 1),
-                border=(0, 0, 0, 0)
+                border=(0, 0, 0, 0),
+                size_hint_y=0.7
             )
-            card_button.bind(on_press=lambda btn, c=num_cards, n=name: self.draw_and_display_spread(c, n))
+            card_button.bind(on_press=lambda btn, c=info["cards"], n=name: self.draw_and_display_spread(c, n))
 
-            label = Label(text=name, font_size='14sp', halign='center')
+            # Spread name
+            name_label = Label(
+                text=name, 
+                font_size='16sp', 
+                halign='center',
+                color=(1, 1, 1, 1),
+                size_hint_y=0.2
+            )
 
-            spread_button.add_widget(card_button)
-            spread_button.add_widget(label)
-            spreads_grid.add_widget(spread_button)
+            # Description
+            desc_label = Label(
+                text=info["description"], 
+                font_size='12sp', 
+                halign='center',
+                color=(0.8, 0.8, 0.8, 1),
+                size_hint_y=0.1
+            )
+
+            spread_container.add_widget(card_button)
+            spread_container.add_widget(name_label)
+            spread_container.add_widget(desc_label)
+            spreads_grid.add_widget(spread_container)
 
         self.main_layout.add_widget(spreads_grid)
 
     def draw_and_display_spread(self, num_cards, spread_name):
+        """Set up the spread display and draw cards"""
         self.main_layout.clear_widgets()
 
-        self.main_layout.add_widget(Label(text=spread_name, font_size='24sp', size_hint_y=0.1))
+        # Title
+        title = Label(
+            text=spread_name, 
+            font_size='24sp', 
+            size_hint_y=0.1,
+            color=(1, 1, 1, 1)
+        )
+        self.main_layout.add_widget(title)
 
-        card_container = BoxLayout(orientation='vertical', size_hint_y=0.8)
+        # Card container
+        card_container = BoxLayout(orientation='vertical', size_hint_y=0.8, spacing=10)
 
-        draw_button = Button(text="Draw Cards", size_hint=(1, 0.1), on_press=lambda btn: self.reveal_cards(num_cards))
+        # Draw button
+        draw_button = Button(
+            text="Draw Cards", 
+            size_hint=(1, 0.15),
+            background_color=(0.2, 0.6, 0.8, 1),
+            color=(1, 1, 1, 1),
+            font_size='18sp'
+        )
+        draw_button.bind(on_press=lambda btn: self.reveal_cards(num_cards))
         card_container.add_widget(draw_button)
 
-        self.card_layout = BoxLayout(orientation='horizontal', spacing=10) if spread_name != "Celtic Cross" else GridLayout(cols=3, spacing=10)
+        # Card layout - adjust based on spread type
+        if spread_name == "Celtic Cross":
+            self.card_layout = GridLayout(cols=4, spacing=5, size_hint_y=0.85)
+        elif num_cards <= 3:
+            self.card_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.85)
+        else:
+            # For larger spreads, use a grid
+            cols = 3 if num_cards > 5 else 2
+            self.card_layout = GridLayout(cols=cols, spacing=5, size_hint_y=0.85)
+
         self.card_images = []
-
         self.cards_to_draw = random.sample(tarot_cards, num_cards)
+        self.orientations = [random.choice(["Upright", "Reversed"]) for _ in range(num_cards)]
 
-        for _ in range(num_cards):
+        card_back_path = self.get_card_back_path()
+
+        for i in range(num_cards):
             card_image = Image(
-                source=get_card_image("CardBacks", "Upright")[0],
+                source=card_back_path or '',
                 allow_stretch=True,
                 keep_ratio=True
             )
@@ -133,33 +254,72 @@ class TarotApp(App):
         card_container.add_widget(self.card_layout)
         self.main_layout.add_widget(card_container)
 
-        back_button = Button(text="Back to Menu", size_hint=(1, 0.1), on_press=lambda btn: self.show_spread_selection())
+        # Back button
+        back_button = Button(
+            text="Back to Menu", 
+            size_hint=(1, 0.1),
+            background_color=(0.6, 0.2, 0.2, 1),
+            color=(1, 1, 1, 1),
+            font_size='16sp'
+        )
+        back_button.bind(on_press=lambda btn: self.show_spread_selection())
         self.main_layout.add_widget(back_button)
 
     def reveal_cards(self, num_cards):
-        self.main_layout.children[-2].clear_widgets()
+        """Reveal the drawn cards with animation"""
+        # Clear the card container and rebuild with revealed cards
+        card_container = self.main_layout.children[1]  # The card container
+        card_container.clear_widgets()
 
-        card_layout_container = self.card_layout if isinstance(self.card_layout, GridLayout) else BoxLayout(orientation='horizontal', spacing=10)
-        card_texts = []
+        # Add a small delay for better UX
+        def reveal_card(i):
+            if i < len(self.card_images):
+                card_image = self.card_images[i]
+                random_card = self.cards_to_draw[i]
+                orientation = self.orientations[i]
+                
+                try:
+                    image_source, is_missing = self.get_card_image_path(random_card, orientation)
+                    
+                    if isinstance(image_source, str):
+                        card_image.source = image_source
+                    elif hasattr(image_source, 'texture'):
+                        card_image.texture = image_source.texture
+                    
+                    card_image.reload()
+                    
+                except Exception as e:
+                    print(f"Error loading card {random_card}: {e}")
+                    # Fallback to card back
+                    card_back = self.get_card_back_path()
+                    if card_back:
+                        card_image.source = card_back
 
-        for i, card_image in enumerate(self.card_images):
-            random_card = self.cards_to_draw[i]
-            orientation = random.choice(["Upright", "Reversed"])
-            image_source, is_missing = get_card_image(random_card, orientation)
+        # Reveal all cards
+        for i in range(num_cards):
+            Clock.schedule_once(lambda dt, idx=i: reveal_card(idx), i * 0.2)
 
-            # Update the image source
-            if isinstance(image_source, str):
-                card_image.source = image_source
-            else:  # BytesIO object for reversed cards
-                card_image.texture = card_image.texture_from_data(image_source.read(), colorfmt='rgba', bufferfmt='ubyte')
-                image_source.close()  # Clean up memory
-            card_image.reload()
-            card_layout_container.add_widget(card_image)
+        # Add the card layout back
+        card_container.add_widget(self.card_layout)
 
-            card_texts.append(f"{random_card} ({orientation})")
+        # Add card names below
+        def show_card_names(dt):
+            card_texts = []
+            for i in range(num_cards):
+                card_name = self.cards_to_draw[i]
+                orientation = self.orientations[i]
+                card_texts.append(f"{card_name} ({orientation})")
+            
+            cards_label = Label(
+                text="\n".join(card_texts), 
+                font_size='14sp', 
+                halign='center',
+                color=(1, 1, 1, 1),
+                text_size=(Window.width - 40, None)
+            )
+            card_container.add_widget(cards_label)
 
-        self.main_layout.children[-2].add_widget(card_layout_container)
-        self.main_layout.children[-2].add_widget(Label(text="\n".join(card_texts), font_size='18sp', halign='center'))
+        Clock.schedule_once(show_card_names, num_cards * 0.2 + 0.5)
 
 if __name__ == '__main__':
     TarotApp().run()
