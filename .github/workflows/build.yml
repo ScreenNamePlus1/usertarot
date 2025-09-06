@@ -36,8 +36,19 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Accept Android SDK licenses
+        run: |
+          # Create a dummy SDK manager home directory
+          mkdir -p "$HOME/.android"
+          # Find the Android SDK path from buildozer
+          ANDROID_SDK_PATH=$(python -c "import buildozer.android.platform.android; print(buildozer.android.platform.android.get_sdk_path())")
+          # Accept all licenses
+          yes | "$ANDROID_SDK_PATH/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
       - name: Build the APK
-        run: buildozer -v android debug
+        run: |
+          # Change to the correct directory before building
+          buildozer -v android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
