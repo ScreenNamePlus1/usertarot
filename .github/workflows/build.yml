@@ -30,26 +30,25 @@ jobs:
 
       - name: Build the APK
         run: |
-          # Install all necessary dependencies
+          # Install all necessary dependencies in one go
           sudo apt update
           sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake
           pip install --user --upgrade cython virtualenv buildozer python-for-android
 
-          # Set the PATH and PYTHONPATH to ensure the buildozer executable and module are found
-          export PATH="$HOME/.local/bin:$PATH"
-          export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
+          # Get the path to the Python executable set up by the action
+          PYTHON_EXECUTABLE=$(which python)
 
           # Create a dummy SDK manager home directory
           mkdir -p "$HOME/.android"
 
-          # Find the Android SDK path from buildozer
-          ANDROID_SDK_PATH=$(python -c "import buildozer.android.platform.android; print(buildozer.android.platform.android.get_sdk_path())")
+          # Find the Android SDK path using the specific Python executable
+          ANDROID_SDK_PATH=$($PYTHON_EXECUTABLE -c "import buildozer.android.platform.android; print(buildozer.android.platform.android.get_sdk_path())")
           
-          # Accept all licenses
+          # Accept all licenses using the SDK manager
           yes | "$ANDROID_SDK_PATH/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
-          # Build the APK
-          buildozer -v android debug
+          # Build the APK using the specific buildozer executable
+          "$HOME/.local/bin/buildozer" -v android debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
