@@ -6,7 +6,7 @@ version = 0.1
 requirements = python3,kivy==2.3.0,pillow==10.4.0
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas
-source.include_patterns = images/*.jpg
+source.include_patterns = images/*.jpg, images/rider-waite-tarot/*.png, images/rider-waite-tarot/*.jpg
 orientation = portrait
 fullscreen = 1
 android.entrypoint = org.kivy.android.PythonActivity
@@ -15,9 +15,9 @@ android.api = 33
 android.minapi = 21
 android.ndk = 23.1.7779620
 android.sdk_path = /home/runner/android-sdk
-# (str) Presplash of the application
+# Presplash image
 android.presplash = images/presplash.png
-# (list) The directory in which to store Android icon files.
+# Icon directory
 android.icons = %(source.dir)s/images/icons
 
 # (str) Android screen orientation.
