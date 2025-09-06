@@ -13,7 +13,7 @@ android.entrypoint = org.kivy.android.PythonActivity
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 android.api = 33
 android.minapi = 21
-android.ndk = 23.1.7779620
+android.ndk = 25b  # Updated from 23.1.7779620 to match p4a recommendation
 android.sdk_path = /home/runner/android-sdk
 # Presplash image
 android.presplash = images/presplash.png
