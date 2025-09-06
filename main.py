@@ -24,13 +24,15 @@ tarot_cards.extend(major_arcana)
 
 # Helper function to get the image path and flip if reversed
 def get_card_image(card_name, orientation):
-    # Map mismatched card names to correct image files
-    image_map = {
-        "Ten of Cups": "Page_of_Cups",
-        "Ten of Pentacles": "Page_of_Pentacles"
-    }
-    image_name = image_map.get(card_name, card_name)
-    image_path = f'images/images/{image_name.replace(" ", "_")}.jpg'
+    # A cleaner and more robust approach is to correctly format the name
+    # without relying on a flawed map.
+    formatted_name = card_name.replace(" ", "_").replace("The_", "")
+    # Handle 'The' specifically for a few cards, though your list shows they
+    # already have it removed. This is a good practice for generalization.
+    if card_name.startswith("The"):
+        formatted_name = card_name.replace(" ", "_")
+        
+    image_path = f'rider-waite-tarot/{formatted_name}.png'
 
     if orientation == "Reversed":
         try:
@@ -40,12 +42,12 @@ def get_card_image(card_name, orientation):
             pil_img_flipped.save(temp_path)
             return temp_path, False
         except FileNotFoundError:
-            return 'images/images/CardBacks.jpg', True
+            return 'rider-waite-tarot/CardBacks.png', True
     try:
         PilImage.open(image_path)
         return image_path, False
     except FileNotFoundError:
-        return 'images/images/CardBacks.jpg', True
+        return 'rider-waite-tarot/CardBacks.png', True
 
 class TarotApp(App):
     def build(self):
@@ -57,7 +59,7 @@ class TarotApp(App):
 
         # Add the main card image, initially showing the card back
         self.card_image = Image(
-            source='images/images/CardBacks.jpg',
+            source='rider-waite-tarot/CardBacks.jpg',
             size_hint=(0.9, 0.8),  # Adjust this to control the size
             pos_hint={'center_x': 0.5},
             allow_stretch=True,  # Allows the image to stretch
@@ -73,7 +75,7 @@ class TarotApp(App):
         main_layout.add_widget(self.card_label)
 
         return main_layout
-    
+
     def on_card_tap(self, instance, touch):
         # Check if the touch is within the bounds of the image
         if instance.collide_point(*touch.pos):
