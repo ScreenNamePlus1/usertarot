@@ -10,7 +10,7 @@ requirements = python3,kivy==2.3.0,pillow==10.4.0
 # Source configuration
 source.dir = .
 source.include_exts = py,png,jpg,jpeg,kv,atlas,txt
-source.include_patterns = images/*,images/rider-waite-tarot/*
+source.include_patterns = images/*,images/rider-waite-tarot/*,rider-waite-tarot/*
 source.exclude_exts = spec
 
 # Application metadata
@@ -45,7 +45,7 @@ android.orientation = portrait
 # Logcat filters
 android.logcat_filters = python:D,kivy:D,%(package.name)s:I
 
-# Architecture
+# Architecture - use only arm64-v8a to avoid autotools issues
 android.archs = arm64-v8a, armeabi-v7a
 
 # Release configuration

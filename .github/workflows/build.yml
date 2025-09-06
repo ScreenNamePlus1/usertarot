@@ -143,6 +143,10 @@ jobs:
           export ANDROID_HOME=$HOME/android-sdk
           export ANDROID_SDK_ROOT=$HOME/android-sdk
           
+          # Fix autotools/libffi issues
+          export ACLOCAL_PATH="/usr/share/aclocal:$ACLOCAL_PATH"
+          export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+          
           # Clean any previous builds if they exist
           buildozer android clean || echo "No previous build to clean"
           
