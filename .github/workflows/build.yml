@@ -28,32 +28,30 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Build the APK
+      - name: Install system dependencies
         run: |
-          # Install all necessary dependencies in one go
           sudo apt update
           sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake
-          pip install --user --upgrade cython virtualenv buildozer python-for-android
 
-          # Use the explicit path for the python and buildozer executables to avoid PATH issues.
-          # We find the exact python executable that was used to install the packages.
-          PYTHON_EXECUTABLE=$(python -c 'import sys; print(sys.executable)')
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --user --upgrade cython virtualenv buildozer==1.5.0 python-for-android
 
-          # Create a dummy SDK manager home directory
-          mkdir -p "$HOME/.android"
-
-          # Find the Android SDK path using the specific Python executable.
-          # This ensures it finds the installed buildozer module.
-          ANDROID_SDK_PATH=$($PYTHON_EXECUTABLE -c "import buildozer.android.platform.android; print(buildozer.android.platform.android.get_sdk_path())")
-          
+      - name: Install Android SDK
+        run: |
+          # Install Android SDK command-line tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d /tmp
+          mkdir -p $HOME/android-sdk/cmdline-tools/latest
+          mv /tmp/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/
+          export ANDROID_HOME=$HOME/android-sdk
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           # Accept all licenses
-          yes | "$ANDROID_SDK_PATH/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-          # Build the APK using the specific buildozer executable
-          "$HOME/.local/bin/buildozer" -v android debug
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tarot-app-apk
-          path: bin/tarot-app-*.apk
+      - name: Build the APK
+        run: |
+          # Ensure buildozer is in PATH
+          export PATH=$HOME/.local/bin:$PATH
+          # Build the APK
+          buildozer -
