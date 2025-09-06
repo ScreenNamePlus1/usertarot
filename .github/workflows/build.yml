@@ -36,6 +36,9 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Update Android toolchain
+        run: buildozer android update
+
       - name: Clean previous build
         run: buildozer android clean
 
