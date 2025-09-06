@@ -132,8 +132,16 @@ jobs:
       - name: Build the APK
         run: |
           export PATH=$HOME/.local/bin:$PATH
-          export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25b
-          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          
+          # Clear conflicting Android NDK environment variables
+          unset ANDROID_NDK
+          unset ANDROID_NDK_ROOT  
+          unset ANDROID_NDK_LATEST_HOME
+          unset ANDROID_NDK_HOME
+          
+          # Set only the variables buildozer needs
+          export ANDROID_HOME=$HOME/android-sdk
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
           
           # Clean any previous builds if they exist
           buildozer android clean || echo "No previous build to clean"
@@ -141,7 +149,8 @@ jobs:
           # Build the APK
           buildozer -v android debug
         env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_HOME: /home/runner/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/android-sdk
 
       - name: List build artifacts
         if: always()
