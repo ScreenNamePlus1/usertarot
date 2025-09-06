@@ -30,13 +30,13 @@ jobs:
 
       - name: Build the APK
         run: |
-          # Install all necessary dependencies in one go
+          # Install all necessary dependencies
           sudo apt update
           sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake
           pip install --user --upgrade cython virtualenv buildozer python-for-android
 
-          # Make sure the user's local bin is in the PATH
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          # Use the explicit path for the python and buildozer executables to avoid PATH issues.
+          export PATH="$HOME/.local/bin:$PATH"
 
           # Create a dummy SDK manager home directory
           mkdir -p "$HOME/.android"
