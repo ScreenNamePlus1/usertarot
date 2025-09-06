@@ -35,16 +35,18 @@ jobs:
           sudo apt install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake
           pip install --user --upgrade cython virtualenv buildozer python-for-android
 
-          # Get the path to the Python executable set up by the action
-          PYTHON_EXECUTABLE=$(which python)
+          # Use the explicit path for the python and buildozer executables to avoid PATH issues.
+          # We find the exact python executable that was used to install the packages.
+          PYTHON_EXECUTABLE=$(python -c 'import sys; print(sys.executable)')
 
           # Create a dummy SDK manager home directory
           mkdir -p "$HOME/.android"
 
-          # Find the Android SDK path using the specific Python executable
+          # Find the Android SDK path using the specific Python executable.
+          # This ensures it finds the installed buildozer module.
           ANDROID_SDK_PATH=$($PYTHON_EXECUTABLE -c "import buildozer.android.platform.android; print(buildozer.android.platform.android.get_sdk_path())")
           
-          # Accept all licenses using the SDK manager
+          # Accept all licenses
           yes | "$ANDROID_SDK_PATH/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
           # Build the APK using the specific buildozer executable
