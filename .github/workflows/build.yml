@@ -36,9 +36,6 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Update Android toolchain
-        run: buildozer android update
-
       - name: Build the APK
         run: buildozer -v android debug
 
