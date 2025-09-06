@@ -45,13 +45,35 @@ jobs:
           mkdir -p $HOME/android-sdk/cmdline-tools/latest
           mv /tmp/cmdline-tools/* $HOME/android-sdk/cmdline-tools/latest/
           export ANDROID_HOME=$HOME/android-sdk
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           # Accept all licenses
           yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          # Install required SDK components
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.0" "platforms;android-33" "ndk;23.1.7779620" || true
+
+      - name: Verify buildozer.spec
+        run: |
+          # Ensure buildozer.spec exists in the repository root
+          if [ ! -f "buildozer.spec" ]; then
+            echo "Error: buildozer.spec not found in the repository root!"
+            exit 1
+          fi
+          # Print project directory structure for debugging
+          echo "Project directory structure:"
+          ls -R
 
       - name: Build the APK
         run: |
           # Ensure buildozer is in PATH
           export PATH=$HOME/.local/bin:$PATH
+          # Verify buildozer installation
+          buildozer --version
           # Build the APK
-          buildozer -
+          buildozer -v android debug
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarot-app-apk
+          path: bin/tarot-app-*.apk
