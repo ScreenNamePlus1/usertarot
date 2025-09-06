@@ -16,12 +16,12 @@ source.include_patterns = images/*,*.png,*.jpg
 orientation = portrait
 fullscreen = 1
 
-# Android specific - simplified
+# Android specific - using more stable API/NDK versions
 android.entrypoint = org.kivy.android.PythonActivity
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE
-android.api = 33
+android.api = 30
 android.minapi = 21
-android.ndk = 25b
+android.ndk = 23c
 android.accept_sdk_license = True
 
 # Use only one architecture to avoid build complexity
