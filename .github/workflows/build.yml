@@ -39,9 +39,6 @@ jobs:
       - name: Update Android toolchain
         run: buildozer android update
 
-      - name: Clean previous build
-        run: buildozer android clean
-
       - name: Build the APK
         run: buildozer -v android debug
 
