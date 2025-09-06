@@ -24,10 +24,9 @@ fullscreen = 1
 # Android specific
 android.entrypoint = org.kivy.android.PythonActivity
 android.permissions = INTERNET,READ_EXTERNAL_STORAGE
-android.api = 34
+android.api = 33
 android.minapi = 21
 android.ndk = 25b
-android.sdk_path = /home/runner/android-sdk
 android.accept_sdk_license = True
 
 # Application icons and graphics
