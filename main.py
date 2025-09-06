@@ -6,6 +6,8 @@ from kivy.uix.label import Label
 from kivy.core.window import Window
 from PIL import Image as PilImage
 import os
+from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
 
 # Set the window background color to black
 Window.clearcolor = (0, 0, 0, 1)
@@ -24,14 +26,19 @@ tarot_cards.extend(major_arcana)
 
 # Helper function to get the image path and flip if reversed
 def get_card_image(card_name, orientation):
-    # A cleaner and more robust approach is to correctly format the name
-    # without relying on a flawed map.
     formatted_name = card_name.replace(" ", "_").replace("The_", "")
-    # Handle 'The' specifically for a few cards, though your list shows they
-    # already have it removed. This is a good practice for generalization.
     if card_name.startswith("The"):
         formatted_name = card_name.replace(" ", "_")
-        
+    
+    # Check for both .png and .jpg for the card backs
+    if formatted_name == "CardBacks":
+        if os.path.exists(f'rider-waite-tarot/CardBacks.png'):
+            return 'rider-waite-tarot/CardBacks.png', False
+        elif os.path.exists(f'rider-waite-tarot/CardBacks.jpg'):
+            return 'rider-waite-tarot/CardBacks.jpg', False
+        else:
+            return None, True
+
     image_path = f'rider-waite-tarot/{formatted_name}.png'
 
     if orientation == "Reversed":
@@ -42,62 +49,112 @@ def get_card_image(card_name, orientation):
             pil_img_flipped.save(temp_path)
             return temp_path, False
         except FileNotFoundError:
-            return 'rider-waite-tarot/CardBacks.png', True
+            return get_card_image("CardBacks", "Upright")[0], True
     try:
         PilImage.open(image_path)
         return image_path, False
     except FileNotFoundError:
-        return 'rider-waite-tarot/CardBacks.png', True
+        return get_card_image("CardBacks", "Upright")[0], True
 
 class TarotApp(App):
     def build(self):
-        # Set up a single main layout
-        main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        # Set the application icon to CardBacks.jpg
+        self.icon = 'rider-waite-tarot/CardBacks.jpg'
+        
+        self.main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
+        self.show_spread_selection()
+        return self.main_layout
 
-        # Add a title label
-        main_layout.add_widget(Label(text="Tap to Draw", font_size='24sp', size_hint_y=0.1))
+    def show_spread_selection(self):
+        self.main_layout.clear_widgets() # Clear all widgets
+        self.main_layout.add_widget(Label(text="Select a Tarot Spread", font_size='24sp', size_hint_y=0.1))
 
-        # Add the main card image, initially showing the card back
-        self.card_image = Image(
-            source='rider-waite-tarot/CardBacks.jpg',
-            size_hint=(0.9, 0.8),  # Adjust this to control the size
-            pos_hint={'center_x': 0.5},
-            allow_stretch=True,  # Allows the image to stretch
-            keep_ratio=True  # Maintains the image's original aspect ratio
-        )
-        main_layout.add_widget(self.card_image)
+        # Use a grid layout for a clean menu of options
+        spreads_grid = GridLayout(cols=3, spacing=10)
+        
+        spread_options = {
+            "Single Card": 1,
+            "Three-Card": 3,
+            "Five-Card": 5,
+            "Seven-Card": 7,
+            "Celtic Cross": 10,
+            "The Cross": 2
+        }
 
-        # Bind the touch event directly to the card image
-        self.card_image.bind(on_touch_down=self.on_card_tap)
+        for name, num_cards in spread_options.items():
+            spread_button = BoxLayout(orientation='vertical', size_hint_y=None, height=150)
+            
+            card_button = Button(
+                background_normal=get_card_image("CardBacks", "Upright")[0],
+                background_down=get_card_image("CardBacks", "Upright")[0],
+                background_color=(1, 1, 1, 1),
+                border=(0, 0, 0, 0)
+            )
+            card_button.bind(on_press=lambda btn, c=num_cards, n=name: self.draw_and_display_spread(c, n))
+            
+            label = Label(text=name, font_size='14sp', halign='center')
+            
+            spread_button.add_widget(card_button)
+            spread_button.add_widget(label)
+            spreads_grid.add_widget(spread_button)
+        
+        self.main_layout.add_widget(spreads_grid)
 
-        # Add a label to display the card name
-        self.card_label = Label(text="Tap the card to reveal your destiny", font_size='24sp', size_hint_y=0.1)
-        main_layout.add_widget(self.card_label)
+    def draw_and_display_spread(self, num_cards, spread_name):
+        self.main_layout.clear_widgets()
+        
+        # Add the title label for the spread
+        self.main_layout.add_widget(Label(text=spread_name, font_size='24sp', size_hint_y=0.1))
+        
+        # Create a container for the cards and bind a touch event to it
+        card_container = BoxLayout(orientation='vertical', size_hint_y=0.8)
+        
+        # Add a "Draw" button
+        draw_button = Button(text="Draw Cards", size_hint=(1, 0.1), on_press=lambda btn: self.reveal_cards(num_cards))
+        card_container.add_widget(draw_button)
+        
+        # The layout for the cards themselves
+        self.card_layout = BoxLayout(orientation='horizontal', spacing=10)
+        
+        if spread_name == "Celtic Cross":
+            # Simplified Celtic Cross layout for demonstration
+            self.card_layout = GridLayout(cols=3, spacing=10)
+            self.card_labels = []
+            
+        self.cards_to_draw = random.sample(tarot_cards, num_cards)
+        self.card_images = []
+        
+        for _ in range(num_cards):
+            card_image = Image(
+                source=get_card_image("CardBacks", "Upright")[0],
+                allow_stretch=True,
+                keep_ratio=True
+            )
+            self.card_images.append(card_image)
+            self.card_layout.add_widget(card_image)
+            
+        card_container.add_widget(self.card_layout)
+        self.main_layout.add_widget(card_container)
+        
+        # Add a back button
+        back_button = Button(text="Back to Menu", size_hint=(1, 0.1), on_press=lambda btn: self.show_spread_selection())
+        self.main_layout.add_widget(back_button)
+        
+    def reveal_cards(self, num_cards):
+        self.main_layout.children[-2].clear_widgets() # Clear the previous layout
 
-        return main_layout
+        card_layout_container = BoxLayout(orientation='horizontal', spacing=10)
+        card_texts = []
+        for i in range(num_cards):
+            random_card = self.cards_to_draw[i]
+            orientation = random.choice(["Upright", "Reversed"])
+            image_path, is_missing = get_card_image(random_card, orientation)
+            
+            # Create new image widgets with the drawn cards
+            card_image = Image(source=image_path, allow_stretch=True, keep_ratio=True)
+            card_layout_container.add_widget(card_image)
+            
+            card_texts.append(f"{random_card} ({orientation})")
 
-    def on_card_tap(self, instance, touch):
-        # Check if the touch is within the bounds of the image
-        if instance.collide_point(*touch.pos):
-            self.draw_single_card()
-
-    def draw_single_card(self):
-        # Select a random card and orientation
-        random_card = random.choice(tarot_cards)
-        orientation = random.choice(["Upright", "Reversed"])
-
-        # Get the correct image path
-        image_path, is_missing = get_card_image(random_card, orientation)
-
-        # Update the card image source and the label text on the same screen
-        self.card_image.source = image_path
-        self.card_image.reload() # Force a reload to show the new image
-
-        # Update the label with the card name and orientation
-        if is_missing:
-            self.card_label.text = f"{random_card} ({orientation}) - Image Missing"
-        else:
-            self.card_label.text = f"{random_card} ({orientation})"
-
-if __name__ == '__main__':
-    TarotApp().run()
+        self.main_layout.children[-2].add_widget(card_layout_container)
+        self.main_layout.children[-2].add_widget(Label(text="\n".join(card_texts), font_size='18sp', halign='center'))
