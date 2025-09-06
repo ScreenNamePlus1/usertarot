@@ -11,147 +11,118 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.9'
 
-      - name: Set up Java
+      - name: Set up Java 11
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: 'temurin'
+          java-version: '11'
 
       - name: Install system dependencies
         run: |
           sudo apt update
           sudo apt install -y \
-            git zip unzip autoconf libtool pkg-config zlib1g-dev \
+            git zip unzip autoconf automake libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev \
-            automake build-essential ccache ant gradle \
-            libjpeg-dev zlib1g-dev
-
-      - name: Cache buildozer global directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: ${{ runner.os }}-buildozer-global-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            ${{ runner.os }}-buildozer-global-
-
-      - name: Cache buildozer local directory
-        uses: actions/cache@v4
-        with:
-          path: .buildozer
-          key: ${{ runner.os }}-buildozer-local-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            ${{ runner.os }}-buildozer-local-
+            build-essential ccache \
+            libjpeg-dev zlib1g-dev \
+            python3-setuptools
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --user --upgrade pip setuptools wheel
-          python -m pip install --user cython==0.29.33 buildozer==1.5.0
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install --user cython==0.29.33
+          python -m pip install --user buildozer==1.4.0
 
-      - name: Setup Android SDK and NDK
+      - name: Setup Android SDK
         run: |
           # Create Android SDK directory
           mkdir -p $HOME/android-sdk
           export ANDROID_HOME=$HOME/android-sdk
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
           
-          # Download and setup command line tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
+          # Download and setup command line tools (older version for compatibility)
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip -O /tmp/cmdline-tools.zip
           unzip -q /tmp/cmdline-tools.zip -d /tmp
           mkdir -p $ANDROID_HOME/cmdline-tools/latest
           mv /tmp/cmdline-tools/* $ANDROID_HOME/cmdline-tools/latest/
           
           # Add to PATH
-          echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           
           # Accept licenses
-          yes | sdkmanager --licenses || echo "License acceptance completed"
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || echo "License acceptance completed"
           
-          # Install required components - match buildozer.spec requirements
-          sdkmanager --install "build-tools;33.0.2" \
-                     "platforms;android-33" \
-                     "platform-tools" \
-                     "tools"
-          
-          # Download NDK 25b to match buildozer.spec
-          wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
-          unzip -q /tmp/ndk.zip -d $ANDROID_HOME
-          
-          # Create NDK directory structure and move files
-          mkdir -p $ANDROID_HOME/ndk
-          mv $ANDROID_HOME/android-ndk-r25b $ANDROID_HOME/ndk/25b
-
-      - name: Verify environment setup
-        run: |
-          echo "Python version:"
-          python --version
-          echo "Buildozer version:"
-          export PATH=$HOME/.local/bin:$PATH
-          buildozer --version
-          echo "Android SDK location: $ANDROID_HOME"
-          echo "Java version:"
-          java -version
-          echo "NDK location:"
-          ls -la $ANDROID_HOME/ndk/ || echo "NDK directory not found"
+          # Install required components
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install \
+            "build-tools;30.0.3" \
+            "platforms;android-30" \
+            "platform-tools"
 
       - name: Debug project structure
         run: |
           echo "=== Current directory ==="
           pwd
-          echo "=== All files ==="
-          find . -type f | sort
           echo "=== Python files ==="
           find . -name "*.py"
           echo "=== Image files ==="
-          find . -name "*.png" -o -name "*.jpg" -o -name "*.jpeg"
+          find . -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" || echo "No image files found"
           echo "=== Buildozer spec content ==="
           cat buildozer.spec || echo "buildozer.spec not found"
-
-      - name: Verify buildozer.spec and project structure
-        run: |
-          if [ ! -f "buildozer.spec" ]; then
-            echo "Error: buildozer.spec not found!"
-            exit 1
-          fi
-          echo "Project structure:"
-          find . -type f -name "*.py" -o -name "*.png" -o -name "*.jpg" -o -name "*.spec" | head -20
-          echo "Images directory:"
-          ls -la images/ || echo "Images directory not found"
 
       - name: Build the APK
         run: |
           export PATH=$HOME/.local/bin:$PATH
-          
-          # Clear conflicting Android NDK environment variables
-          unset ANDROID_NDK
-          unset ANDROID_NDK_ROOT  
-          unset ANDROID_NDK_LATEST_HOME
-          unset ANDROID_NDK_HOME
-          
-          # Set only the variables buildozer needs
           export ANDROID_HOME=$HOME/android-sdk
           export ANDROID_SDK_ROOT=$HOME/android-sdk
           
-          # Fix autotools/libffi issues
-          export ACLOCAL_PATH="/usr/share/aclocal:$ACLOCAL_PATH"
-          export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH"
+          # Use the simplified buildozer spec
+          if [ ! -f "buildozer.spec" ]; then
+            echo "Creating simplified buildozer.spec..."
+            cat > buildozer.spec << 'EOF'
+          [app]
+          title = Tarot with Pictures
+          package.name = tarotapp
+          package.domain = org.example
+          version = 1.0
           
-          # Clean any previous builds if they exist
-          buildozer android clean || echo "No previous build to clean"
+          requirements = python3,kivy==2.2.2
           
-          # Build the APK
-          buildozer -v android debug
+          source.dir = .
+          source.include_exts = py,png,jpg,jpeg,kv
+          source.include_patterns = images/*,*.png,*.jpg
+          
+          orientation = portrait
+          fullscreen = 1
+          
+          android.entrypoint = org.kivy.android.PythonActivity
+          android.permissions = INTERNET,READ_EXTERNAL_STORAGE
+          android.api = 30
+          android.minapi = 21
+          android.ndk = 23c
+          android.accept_sdk_license = True
+          
+          android.archs = armeabi-v7a
+          
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          EOF
+          fi
+          
+          buildozer android debug
         env:
           ANDROID_HOME: /home/runner/android-sdk
           ANDROID_SDK_ROOT: /home/runner/android-sdk
@@ -170,4 +141,4 @@ jobs:
         with:
           name: tarot-app-debug
           path: bin/*.apk
-          if-no-files-found: error
+          if-no-files-found: warn

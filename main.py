@@ -154,3 +154,131 @@ class TarotApp(App):
                 halign='center',
                 color=(0.8, 0.8, 0.8, 1),
                 size_hint_y=0.1
+            )
+
+            spread_container.add_widget(card_button)
+            spread_container.add_widget(name_label)
+            spread_container.add_widget(desc_label)
+            spreads_grid.add_widget(spread_container)
+
+        self.main_layout.add_widget(spreads_grid)
+
+    def draw_and_display_spread(self, num_cards, spread_name):
+        """Set up the spread display and draw cards"""
+        self.main_layout.clear_widgets()
+
+        # Title
+        title = Label(
+            text=spread_name, 
+            font_size='24sp', 
+            size_hint_y=0.1,
+            color=(1, 1, 1, 1)
+        )
+        self.main_layout.add_widget(title)
+
+        # Card container
+        card_container = BoxLayout(orientation='vertical', size_hint_y=0.8, spacing=10)
+
+        # Draw button
+        draw_button = Button(
+            text="Draw Cards", 
+            size_hint=(1, 0.15),
+            background_color=(0.2, 0.6, 0.8, 1),
+            color=(1, 1, 1, 1),
+            font_size='18sp'
+        )
+        draw_button.bind(on_press=lambda btn: self.reveal_cards(num_cards))
+        card_container.add_widget(draw_button)
+
+        # Card layout - adjust based on spread type
+        if spread_name == "Celtic Cross":
+            self.card_layout = GridLayout(cols=4, spacing=5, size_hint_y=0.85)
+        elif num_cards <= 3:
+            self.card_layout = BoxLayout(orientation='horizontal', spacing=10, size_hint_y=0.85)
+        else:
+            # For larger spreads, use a grid
+            cols = 3 if num_cards > 5 else 2
+            self.card_layout = GridLayout(cols=cols, spacing=5, size_hint_y=0.85)
+
+        self.card_images = []
+        self.cards_to_draw = random.sample(tarot_cards, num_cards)
+        self.orientations = [random.choice(["Upright", "Reversed"]) for _ in range(num_cards)]
+
+        card_back_path = self.get_card_back_path()
+
+        for i in range(num_cards):
+            card_image = Image(
+                source=card_back_path or '',
+                allow_stretch=True,
+                keep_ratio=True
+            )
+            self.card_images.append(card_image)
+            self.card_layout.add_widget(card_image)
+
+        card_container.add_widget(self.card_layout)
+        self.main_layout.add_widget(card_container)
+
+        # Back button
+        back_button = Button(
+            text="Back to Menu", 
+            size_hint=(1, 0.1),
+            background_color=(0.6, 0.2, 0.2, 1),
+            color=(1, 1, 1, 1),
+            font_size='16sp'
+        )
+        back_button.bind(on_press=lambda btn: self.show_spread_selection())
+        self.main_layout.add_widget(back_button)
+
+    def reveal_cards(self, num_cards):
+        """Reveal the drawn cards - simplified without rotation"""
+        # Clear the card container and rebuild with revealed cards
+        card_container = self.main_layout.children[1]  # The card container
+        card_container.clear_widgets()
+
+        # Reveal all cards
+        for i in range(num_cards):
+            card_image = self.card_images[i]
+            random_card = self.cards_to_draw[i]
+            # Always show upright image (no PIL rotation)
+            
+            try:
+                image_source, is_missing = self.get_card_image_path(random_card, "Upright")
+                if image_source:
+                    card_image.source = image_source
+                    card_image.reload()
+            except Exception as e:
+                print(f"Error loading card {random_card}: {e}")
+                # Fallback to card back
+                card_back = self.get_card_back_path()
+                if card_back:
+                    card_image.source = card_back
+
+        # Add the card layout back
+        card_container.add_widget(self.card_layout)
+
+        # Add card names with orientation indicators
+        def show_card_names(dt):
+            card_texts = []
+            for i in range(num_cards):
+                card_name = self.cards_to_draw[i]
+                orientation = self.orientations[i]
+                # Add visual indicator for reversed cards
+                if orientation == "Reversed":
+                    display_text = f"{card_name} (↓ Reversed)"
+                else:
+                    display_text = f"{card_name} (↑ Upright)"
+                card_texts.append(display_text)
+            
+            cards_label = Label(
+                text="\n".join(card_texts), 
+                font_size='14sp', 
+                halign='center',
+                color=(1, 1, 1, 1),
+                text_size=(Window.width - 40, None)
+            )
+            card_container.add_widget(cards_label)
+
+        Clock.schedule_once(show_card_names, 0.5)
+
+if __name__ == '__main__':
+    TarotApp().run()
