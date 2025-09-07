@@ -286,18 +286,22 @@ class TarotApp(App):
                 instance.source = image_source
                 instance.reload()
 
-            # Update the label with the card name
-            # The label is the first child of the parent container
+            # Find the label within the parent container
             card_container = instance.parent
-            position_label = card_container.children[0]
-            
-            # Use a short delay to allow the card flip to be seen
-            def update_label(dt):
-                position_label.text = f"{card_name}\n({position_label.text})"
-            
-            Clock.schedule_once(update_label, 0.1)
+            position_label = None
+            for child in card_container.children:
+                if isinstance(child, Label):
+                    position_label = child
+                    break
+
+            if position_label:
+                # Use a short delay to allow the card flip to be seen
+                def update_label(dt):
+                    # Replace the existing text with the card name and orientation
+                    position_label.text = f"{card_name}\n({orientation})"
+                
+                Clock.schedule_once(update_label, 0.1)
 
 
 if __name__ == '__main__':
     TarotApp().run()
-
