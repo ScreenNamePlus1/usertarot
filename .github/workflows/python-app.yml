@@ -17,24 +17,93 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.9'
 
-      - name: Install buildozer and dependencies
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-11-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtool wget python3-distutils
-          pip3 install --upgrade pip
-          pip3 install buildozer
-          pip3 install "kivy[full]" --no-deps
-          pip3 install "git+https://github.com/kivy/python-for-android.git"
+          sudo apt-get install -y \
+            git zip unzip autoconf libtool pkg-config \
+            zlib1g-dev libncurses5-dev libncursesw5-dev \
+            libtool wget curl lld imagemagick
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install buildozer==1.5.0
+          pip install cython==0.29.33
+
+      - name: Use system Android SDK and setup buildozer directories
+        run: |
+          # Create buildozer directory structure pointing to system SDK
+          mkdir -p ~/.buildozer/android/platform
+          
+          # Link to the existing system Android SDK
+          ln -sf /usr/local/lib/android/sdk ~/.buildozer/android/platform/android-sdk
+          
+          # Accept all SDK licenses using system sdkmanager
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+          
+          # Install required components
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-33"
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;33.0.2"
+          
+          # Create the legacy tools/bin directory structure for buildozer
+          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          
+          # Create symlinks for all the tools buildozer expects
+          cd ~/.buildozer/android/platform/android-sdk/tools/bin
+          for tool in /usr/local/lib/android/sdk/cmdline-tools/latest/bin/*; do
+            ln -sf "$tool" "$(basename "$tool")"
+          done
+
+      - name: Create test image
+        run: |
+          mkdir -p images
+          convert -size 200x300 xc:blue images/CardBacks.jpg
+
+      - name: Verify SDK setup
+        run: |
+          echo "=== Checking SDK structure ==="
+          ls -la ~/.buildozer/android/platform/android-sdk/
+          echo "=== Checking tools/bin ==="
+          ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/
+          echo "=== Testing sdkmanager ==="
+          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --version
+
+      - name: Clean buildozer project directory
+        run: |
+          rm -rf .buildozer
 
       - name: Build with buildozer
+        env:
+          JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+          ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+          ANDROID_NDK_HOME: /home/runner/.buildozer/android/platform/android-ndk-r25b
         run: |
-          yes | buildozer android debug
+          buildozer android debug --verbose
+
+      - name: Find and list APK
+        if: always()
+        run: |
+          echo "=== All APK files ==="
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
+          echo "=== Bin directory ==="
+          ls -la bin/ 2>/dev/null || echo "No bin directory"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: apk
-          path: bin/*.apk
+          name: tarot-apk
+          path: |
+            bin/*.apk
+            .buildozer/android/platform/build*/dists/*/bin/*.apk
+          retention-days: 30
