@@ -14,21 +14,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.8
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
+          python-version: '3.10' # Recommended Python version for Kivy
 
-      - name: Install buildozer and dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-8-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtool wget python3-distutils
+          sudo apt-get install -y build-essential git-core ccache automake libtool zlib1g-dev python3-pip openjdk-11-jdk autoconf pkg-config libncurses5-dev libncursesw5-dev libtool wget unzip
           pip3 install --upgrade pip wheel setuptools
-          pip3 install buildozer cython==0.29.21
+          pip3 install buildozer "cython>=0.29.34" # Use a more recent Cython
+          pip3 install "kivy[full]" --no-deps
+          pip3 install "git+https://github.com/kivy/python-for-android.git" # Explicitly get the latest P4A
 
       - name: Build with buildozer
         run: |
-          yes | buildozer android debug
+          buildozer android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v3
