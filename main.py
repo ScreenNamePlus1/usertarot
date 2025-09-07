@@ -64,7 +64,7 @@ class TarotApp(App):
 
     def get_card_image_path(self, card_name, orientation="Upright"):
         """Get the correct image path for a card with simplified handling"""
-        base_path = self.get_image_base_path(
+        base_path = self.get_image_base_path()
 
         # Format the card name for file lookup
         formatted_name = card_name.replace(" ", "_")
@@ -102,7 +102,7 @@ class TarotApp(App):
 
     def show_spread_selection(self):
         """Display the spread selection screen"""
-        self.main_layout.clear_widgets(
+        self.main_layout.clear_widgets()
 
         # Title
         title = Label(
