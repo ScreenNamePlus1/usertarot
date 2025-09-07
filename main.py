@@ -29,7 +29,7 @@ tarot_cards.extend(major_arcana)
 class TarotApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        
+
     def build(self):
         # Set the application icon - check multiple possible paths
         icon_paths = [
@@ -37,7 +37,7 @@ class TarotApp(App):
             'images/CardBacks.jpg',
             'CardBacks.jpg'
         ]
-        
+
         for path in icon_paths:
             if os.path.exists(path):
                 self.icon = path
@@ -54,7 +54,7 @@ class TarotApp(App):
             'images/',
             ''
         ]
-        
+
         for path in possible_paths:
             test_files = ['CardBacks.png', 'CardBacks.jpg', 'The_Fool.png', 'The_Fool.jpg']
             for test_file in test_files:
@@ -64,8 +64,8 @@ class TarotApp(App):
 
     def get_card_image_path(self, card_name, orientation="Upright"):
         """Get the correct image path for a card with simplified handling"""
-        base_path = self.get_image_base_path()
-        
+        base_path = self.get_image_base_path(
+
         # Format the card name for file lookup
         formatted_name = card_name.replace(" ", "_")
         if card_name.startswith("The "):
@@ -87,7 +87,7 @@ class TarotApp(App):
             image_path = f'{base_path}{formatted_name}{ext}'
             if os.path.exists(image_path):
                 return image_path, False
-        
+
         # Fallback to card back
         return self.get_card_image_path("CardBacks", "Upright")
 
@@ -102,8 +102,8 @@ class TarotApp(App):
 
     def show_spread_selection(self):
         """Display the spread selection screen"""
-        self.main_layout.clear_widgets()
-        
+        self.main_layout.clear_widgets(
+
         # Title
         title = Label(
             text="Select a Tarot Spread", 
@@ -240,7 +240,7 @@ class TarotApp(App):
             card_image = self.card_images[i]
             random_card = self.cards_to_draw[i]
             # Always show upright image (no PIL rotation)
-            
+
             try:
                 image_source, is_missing = self.get_card_image_path(random_card, "Upright")
                 if image_source:
@@ -268,7 +268,7 @@ class TarotApp(App):
                 else:
                     display_text = f"{card_name} (↑ Upright)"
                 card_texts.append(display_text)
-            
+
             cards_label = Label(
                 text="\n".join(card_texts), 
                 font_size='14sp', 

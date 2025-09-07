@@ -1,83 +1,38 @@
 name: Build Tarot APK
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.8'
 
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - name: Install buildozer and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-8-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtool wget python3-distutils
+          pip3 install --upgrade pip wheel setuptools
+          pip3 install buildozer cython==0.29.21
+
+      - name: Build with buildozer
+        run: |
+          yes | buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        if: always()
         with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev automake libjpeg-dev
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install cython==0.29.33 buildozer==1.5.0
-
-      - name: Setup Android SDK and NDK
-        id: android_setup
-        run: |
-          mkdir -p "$HOME/android-sdk"
-          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip
-          unzip -q /tmp/cmdline-tools.zip -d "$HOME/android-sdk/cmdline-tools"
-          mv "$HOME/android-sdk/cmdline-tools/cmdline-tools" "$HOME/android-sdk/cmdline-tools/latest"
-
-          # Add SDK tools to PATH
-          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
-
-          yes | sdkmanager --licenses
-          yes | sdkmanager "build-tools;33.0.2" "platforms;android-33" "platform-tools" "tools"
-
-          wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
-          unzip -q /tmp/ndk.zip -d "$HOME/android-sdk"
-          mv "$HOME/android-sdk/android-ndk-r25b" "$HOME/android-sdk/ndk/25b"
-          echo "ANDROID_NDK_HOME=$HOME/android-sdk/ndk/25b" >> $GITHUB_ENV
-          
-          # Optional: Add buildozer data directory to path for consistency
-          echo "$HOME/.buildozer/android/platform/build-tools" >> $GITHUB_PATH
-
-      - name: Build the APK with Buildozer
-        run: |
-          # Print environment variables for debugging
-          echo "ANDROID_HOME is: $ANDROID_HOME"
-          echo "ANDROID_NDK_HOME is: $ANDROID_NDK_HOME"
-          echo "GITHUB_ENV is: $GITHUB_ENV"
-          echo "PATH is: $PATH"
-
-          # Check for buildozer.spec file
-          if [ ! -f "buildozer.spec" ]; then
-            echo "::error::buildozer.spec file not found. Please ensure it is in the repository root."
-            exit 1
-          fi
-
-          # The buildozer command will use the environment variables set globally
-          buildozer -v android debug
-
-      - name: Upload APK artifact
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tarot-apk
+          name: apk
           path: bin/*.apk
