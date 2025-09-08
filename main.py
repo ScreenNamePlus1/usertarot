@@ -12,6 +12,7 @@ from kivy.graphics.context_instructions import PushMatrix, PopMatrix
 from kivy.graphics.vertex_instructions import Rotate
 from kivy.uix.carousel import Carousel
 from kivy.uix.relativelayout import RelativeLayout
+from kivy.logger import Logger
 
 # Set the window background color to black
 Window.clearcolor = (0, 0, 0, 1)
@@ -32,34 +33,62 @@ tarot_cards.extend(major_arcana)
 
 
 class RotatableImage(Image):
-    """A custom Image widget that can be rotated on its canvas."""
+    """A custom Image widget that can be rotated on its canvas - Android fixed version."""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.angle = 0  # Default rotation angle
-        self.bind(pos=self.update_rotation, size=self.update_rotation)
+        self._angle = 0  # Use private attribute to avoid property conflicts
+        # Bind to texture changes to ensure rotation happens after image loads
+        self.bind(texture=self._update_rotation, pos=self._update_rotation, size=self._update_rotation)
+        
+    @property
+    def angle(self):
+        return self._angle
+        
+    @angle.setter
+    def angle(self, value):
+        if self._angle != value:
+            self._angle = value
+            self._update_rotation()
 
-    def update_rotation(self, *args):
+    def _update_rotation(self, *args):
+        """Update rotation - safer Android implementation"""
+        if not self.canvas:
+            return
+            
+        # Clear previous transformations
         self.canvas.before.clear()
-        with self.canvas.before:
-            PushMatrix()
-            Rotate(
-                angle=self.angle,
-                axis=(0, 0, 1),
-                origin=self.center
-            )
-    
-    def on_angle(self, instance, value):
-        self.angle = value
-        self.update_rotation()
+        
+        # Only apply rotation if we have a valid texture and angle
+        if self.texture and self._angle != 0:
+            with self.canvas.before:
+                PushMatrix()
+                # Use more precise center calculation
+                center_x = self.x + self.width / 2.0
+                center_y = self.y + self.height / 2.0
+                Rotate(
+                    angle=self._angle,
+                    origin=(center_x, center_y)
+                )
+            
+            # Schedule the PopMatrix to be added after the widget is drawn
+            with self.canvas.after:
+                PopMatrix()
+        elif self._angle == 0:
+            # Clear after transformations if no rotation
+            self.canvas.after.clear()
 
 
 class TarotApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        Logger.info("TarotApp: Initializing")
 
     def build(self):
+        Logger.info("TarotApp: Building app")
+        
         # Set the application icon - check multiple possible paths
         icon_paths = [
+            'images/AppIcons/playstore.png',
             'images/rider-waite-tarot/CardBacks.jpg',
             'images/CardBacks.jpg',
             'CardBacks.jpg'
@@ -68,6 +97,7 @@ class TarotApp(App):
         for path in icon_paths:
             if os.path.exists(path):
                 self.icon = path
+                Logger.info(f"TarotApp: Using icon: {path}")
                 break
 
         self.main_layout = BoxLayout(orientation='vertical', padding=20, spacing=10)
@@ -128,6 +158,7 @@ class TarotApp(App):
 
     def show_spread_selection(self):
         """Display the spread selection screen with a new layout."""
+        Logger.info("TarotApp: Showing spread selection")
         self.main_layout.clear_widgets()
 
         # Title
@@ -197,9 +228,9 @@ class TarotApp(App):
 
         self.main_layout.add_widget(spreads_layout)
 
-
     def draw_and_display_spread(self, num_cards, spread_name):
         """Set up the spread display with a Carousel for one card at a time."""
+        Logger.info(f"TarotApp: Drawing spread: {spread_name} with {num_cards} cards")
         self.main_layout.clear_widgets()
 
         # Title
@@ -212,7 +243,12 @@ class TarotApp(App):
         self.main_layout.add_widget(title)
 
         # The Carousel will hold the individual card widgets
-        self.card_carousel = Carousel(direction='right', size_hint_y=0.8)
+        self.card_carousel = Carousel(
+            direction='right', 
+            size_hint_y=0.8,
+            loop=True  # Allow infinite scrolling
+        )
+        
         self.card_images = []
         self.cards_to_draw = random.sample(tarot_cards, num_cards)
         self.orientations = [random.choice(["Upright", "Reversed"]) for _ in range(num_cards)]
@@ -222,28 +258,30 @@ class TarotApp(App):
             # Container for each card and its label
             card_container = BoxLayout(orientation='vertical', padding=10, spacing=5)
 
-            # Create the card image
+            # Create the card image with proper initialization
             card_image = RotatableImage(
                 source=card_back_path or '',
                 allow_stretch=True,
                 keep_ratio=True
             )
-            # We'll use the ID to reference the correct card data
-            card_image.id = str(i)
-            # This flag prevents a card from being flipped again
+            
+            # Store card index and revealed state as attributes
+            card_image.card_index = i
             card_image.revealed = False
             
-            # Bind a touch event to each card image
+            # Bind touch event more safely
             card_image.bind(on_touch_down=self.on_card_touch)
             
             self.card_images.append(card_image)
 
             # Label to show card name and position
             position_label = Label(
-                text=f"Position {i + 1}",
+                text=f"Position {i + 1}\nTap card to reveal",
                 font_size='20sp',
-                color=(1,1,1,1)
+                color=(1, 1, 1, 1),
+                halign='center'
             )
+            position_label.text_size = (None, None)  # Allow text wrapping
             
             card_container.add_widget(card_image)
             card_container.add_widget(position_label)
@@ -264,17 +302,21 @@ class TarotApp(App):
         self.main_layout.add_widget(back_button)
 
     def on_card_touch(self, instance, touch):
-        """Handles the tap on a card image to reveal it."""
+        """Handles the tap on a card image to reveal it - Android-safe version."""
         # Check if the touch is within the widget's bounds and it hasn't been revealed
-        if instance.collide_point(*touch.pos) and not instance.revealed:
+        if not instance.collide_point(*touch.pos) or instance.revealed:
+            return False
+            
+        try:
+            Logger.info(f"TarotApp: Revealing card {instance.card_index}")
             instance.revealed = True
-            card_index = int(instance.id)
+            card_index = instance.card_index
 
             # Get the card's data
             card_name = self.cards_to_draw[card_index]
             orientation = self.orientations[card_index]
 
-            # Set the rotation angle
+            # Set the rotation angle using property
             if orientation == "Reversed":
                 instance.angle = 180
             else:
@@ -282,26 +324,31 @@ class TarotApp(App):
 
             # Update the card image source
             image_source, is_missing = self.get_card_image_path(card_name, "Upright")
-            if image_source:
+            if image_source and os.path.exists(image_source):
                 instance.source = image_source
-                instance.reload()
+                # Force texture reload
+                Clock.schedule_once(lambda dt: instance.reload(), 0.1)
 
-            # Find the label within the parent container
+            # Find the label within the parent container and update it
             card_container = instance.parent
-            position_label = None
-            for child in card_container.children:
-                if isinstance(child, Label):
-                    position_label = child
-                    break
-
-            if position_label:
-                # Use a short delay to allow the card flip to be seen
-                def update_label(dt):
-                    # Replace the existing text with the card name and orientation
-                    position_label.text = f"{card_name}\n({orientation})"
-                
-                Clock.schedule_once(update_label, 0.1)
+            if card_container:
+                for child in card_container.children:
+                    if isinstance(child, Label):
+                        # Schedule label update to avoid conflicts with image loading
+                        def update_label(dt):
+                            child.text = f"{card_name}\n({orientation})"
+                            Logger.info(f"TarotApp: Card revealed: {card_name} ({orientation})")
+                        
+                        Clock.schedule_once(update_label, 0.2)
+                        break
+            
+            return True  # Consume the touch event
+            
+        except Exception as e:
+            Logger.error(f"TarotApp: Error in on_card_touch: {str(e)}")
+            return False
 
 
 if __name__ == '__main__':
+    Logger.info("TarotApp: Starting application")
     TarotApp().run()
