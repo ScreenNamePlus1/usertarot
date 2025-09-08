@@ -8,6 +8,7 @@ source.dir = .
 source.include_exts = py,png,kv,atlas
 fullscreen = 0
 icon.filename = images/AppIcons/playstore.png
+orientation = portrait
 
 [buildozer]
 log_level = 2
@@ -22,4 +23,5 @@ android.archs = arm64-v8a, armeabi-v7a
 android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 android.extract_native_libs = False
 android.accept_sdk_license = True
+android.orientation = portrait
 p4a.branch = develop
