@@ -8,13 +8,12 @@ import os
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
 from kivy.clock import Clock
-from kivy.uix.carousel import Carousel
-from kivy.uix.relativelayout import RelativeLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.logger import Logger
 from kivy.graphics import PushMatrix, PopMatrix, Rotate
+from kivy.uix.behaviors import ButtonBehavior
 
-# Set the window background color to black
+# Force portrait orientation and set black background
 Window.clearcolor = (0, 0, 0, 1)
 
 # Define the suits and ranks of the tarot cards
@@ -32,34 +31,101 @@ for suit in suits:
 tarot_cards.extend(major_arcana)
 
 
-class RotatedTarotImage(Image):
-    """A robust rotatable image widget for tarot cards"""
-    def __init__(self, **kwargs):
+class TarotCardImage(ButtonBehavior, Image):
+    """A tarot card that acts as a button with immediate rotation"""
+    def __init__(self, card_name, orientation, **kwargs):
         super().__init__(**kwargs)
-        self._rotation_angle = 0
-        self.bind(pos=self._update_rotation, size=self._update_rotation)
-        Clock.schedule_once(self._update_rotation, 0.1)
+        self.card_name = card_name
+        self.orientation = orientation
+        self.is_revealed = False
         
-    def set_rotation(self, angle):
-        """Set the rotation angle for the card"""
-        self._rotation_angle = angle
-        self._update_rotation()
-        
-    def _update_rotation(self, *args):
-        """Apply rotation transformation to the widget"""
+        # Apply rotation immediately if reversed
+        if orientation == "Reversed":
+            self._apply_rotation()
+    
+    def _apply_rotation(self):
+        """Apply 180-degree rotation immediately"""
         self.canvas.before.clear()
         self.canvas.after.clear()
         
-        if self._rotation_angle != 0:
+        with self.canvas.before:
+            PushMatrix()
+            # Rotate around center
+            Rotate(angle=180, origin=(self.center_x, self.center_y))
+            
+        with self.canvas.after:
+            PopMatrix()
+            
+        # Rebind to update rotation when position changes
+        self.bind(pos=self._update_rotation, size=self._update_rotation)
+    
+    def _update_rotation(self, *args):
+        """Update rotation center when position/size changes"""
+        if self.orientation == "Reversed":
+            self.canvas.before.clear()
+            self.canvas.after.clear()
+            
             with self.canvas.before:
                 PushMatrix()
-                # Calculate center point for rotation
-                center_x = self.center_x
-                center_y = self.center_y
-                Rotate(angle=self._rotation_angle, origin=(center_x, center_y))
+                Rotate(angle=180, origin=(self.center_x, self.center_y))
                 
             with self.canvas.after:
                 PopMatrix()
+
+
+class CardButton(ButtonBehavior, FloatLayout):
+    """A card-shaped button for the menu"""
+    def __init__(self, card_image_path, title_text, subtitle_text, **kwargs):
+        super().__init__(**kwargs)
+        
+        # Card background image
+        card_bg = Image(
+            source=card_image_path,
+            allow_stretch=True,
+            keep_ratio=True,
+            size_hint=(1, 1),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5}
+        )
+        self.add_widget(card_bg)
+        
+        # Semi-transparent overlay for text readability
+        overlay = FloatLayout(
+            size_hint=(1, 1),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5}
+        )
+        
+        # Title
+        title = Label(
+            text=title_text,
+            font_size='18sp',
+            bold=True,
+            color=(1, 1, 1, 1),
+            outline_color=(0, 0, 0, 1),
+            outline_width=2,
+            size_hint=(1, 0.3),
+            pos_hint={'center_x': 0.5, 'center_y': 0.7},
+            halign='center',
+            valign='middle'
+        )
+        title.bind(size=title.setter('text_size'))
+        
+        # Subtitle
+        subtitle = Label(
+            text=subtitle_text,
+            font_size='14sp',
+            color=(0.9, 0.9, 0.9, 1),
+            outline_color=(0, 0, 0, 1),
+            outline_width=1,
+            size_hint=(1, 0.2),
+            pos_hint={'center_x': 0.5, 'center_y': 0.3},
+            halign='center',
+            valign='middle'
+        )
+        subtitle.bind(size=subtitle.setter('text_size'))
+        
+        overlay.add_widget(title)
+        overlay.add_widget(subtitle)
+        self.add_widget(overlay)
 
 
 class TarotApp(App):
@@ -70,7 +136,7 @@ class TarotApp(App):
     def build(self):
         Logger.info("TarotApp: Building app")
         
-        # Set the application icon - check multiple possible paths
+        # Set the application icon
         icon_paths = [
             'images/AppIcons/playstore.png',
             'images/rider-waite-tarot/CardBacks.jpg',
@@ -84,19 +150,10 @@ class TarotApp(App):
                 Logger.info(f"TarotApp: Using icon: {path}")
                 break
 
-        # Use FloatLayout as root to prevent off-screen issues
-        self.root_layout = FloatLayout()
-        self.main_layout = BoxLayout(
-            orientation='vertical', 
-            padding=20, 
-            spacing=10,
-            size_hint=(0.95, 0.95),  # Ensure it stays within screen bounds
-            pos_hint={'center_x': 0.5, 'center_y': 0.5}
-        )
-        self.root_layout.add_widget(self.main_layout)
-        
-        self.show_spread_selection()
-        return self.root_layout
+        # Main container - always portrait
+        self.main_layout = FloatLayout()
+        self.show_card_menu()
+        return self.main_layout
 
     def get_image_base_path(self):
         """Determine the correct base path for images"""
@@ -111,35 +168,33 @@ class TarotApp(App):
             for test_file in test_files:
                 if os.path.exists(f"{path}{test_file}"):
                     return path
-        return 'images/'  # Default fallback
+        return 'images/'
 
-    def get_card_image_path(self, card_name, orientation="Upright"):
-        """Get the correct image path for a card with simplified handling"""
+    def get_card_image_path(self, card_name):
+        """Get the correct image path for a card"""
         base_path = self.get_image_base_path()
 
         # Format the card name for file lookup
         formatted_name = card_name.replace(" ", "_")
         if card_name.startswith("The "):
             formatted_name = card_name.replace(" ", "_")
-        else:
-            formatted_name = card_name.replace(" ", "_").replace("The_", "")
 
         # Handle card back as special case
         if formatted_name == "CardBacks" or card_name == "CardBacks":
             for ext in ['.png', '.jpg', '.jpeg']:
                 path = f'{base_path}CardBacks{ext}'
                 if os.path.exists(path):
-                    return path, False
-            return None, True
+                    return path
+            return None
 
         # Try different file extensions
         for ext in ['.png', '.jpg', '.jpeg']:
             image_path = f'{base_path}{formatted_name}{ext}'
             if os.path.exists(image_path):
-                return image_path, False
+                return image_path
 
         # Fallback to card back
-        return self.get_card_image_path("CardBacks", "Upright")
+        return self.get_card_back_path()
 
     def get_card_back_path(self):
         """Get the path to the card back image"""
@@ -150,234 +205,172 @@ class TarotApp(App):
                 return path
         return None
 
-    def show_spread_selection(self):
-        """Display the spread selection screen with a safer grid layout."""
-        Logger.info("TarotApp: Showing spread selection")
+    def show_card_menu(self):
+        """Display the main menu with card-shaped buttons"""
+        Logger.info("TarotApp: Showing card menu")
         self.main_layout.clear_widgets()
+
+        # Background container
+        container = BoxLayout(
+            orientation='vertical',
+            padding=30,
+            spacing=20,
+            size_hint=(0.9, 0.9),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5}
+        )
 
         # Title
         title = Label(
-            text="Select a Tarot Spread",
-            font_size='24sp',
+            text="Choose Your Reading",
+            font_size='28sp',
+            bold=True,
+            color=(1, 1, 1, 1),
             size_hint_y=0.15,
-            color=(1, 1, 1, 1)
+            halign='center'
         )
-        self.main_layout.add_widget(title)
+        container.add_widget(title)
 
-        # Use a simple grid layout instead of RelativeLayout for better stability
-        spreads_layout = GridLayout(
-            cols=2, 
-            rows=2, 
-            spacing=20, 
-            padding=20,
-            size_hint_y=0.75
+        # Card grid - 2x2 layout
+        cards_grid = GridLayout(
+            cols=2,
+            rows=2,
+            spacing=15,
+            size_hint_y=0.85
         )
 
+        # Get card back image for buttons
+        card_back_path = self.get_card_back_path()
+
+        # Spread options with card-like buttons
         spread_options = [
-            ("Single Card", 1, "Focus on one question"),
-            ("Three-Card", 3, "Past, Present, Future"),
-            ("Five-Card", 5, "Detailed insight"),
+            ("Single Card", 1, "One card for focus"),
+            ("Three-Card", 3, "Past • Present • Future"),
+            ("Five-Card", 5, "Deeper insight"),
             ("Celtic Cross", 10, "Complete reading")
         ]
 
         for name, cards, description in spread_options:
-            # Create a container for each spread option
-            spread_container = BoxLayout(orientation='vertical', spacing=5)
-            
-            # Create the button
-            spread_button = Button(
-                text=name,
-                background_color=(0.3, 0.3, 0.6, 1),
-                color=(1, 1, 1, 1),
-                font_size='16sp'
+            card_button = CardButton(
+                card_image_path=card_back_path or '',
+                title_text=name,
+                subtitle_text=description
             )
-            spread_button.bind(on_press=lambda btn, c=cards, n=name: self.draw_and_display_spread(c, n))
-            
-            # Create description label
-            desc_label = Label(
-                text=description,
-                font_size='12sp',
-                color=(0.8, 0.8, 0.8, 1),
-                size_hint_y=0.3
-            )
-            
-            spread_container.add_widget(spread_button)
-            spread_container.add_widget(desc_label)
-            spreads_layout.add_widget(spread_container)
+            card_button.bind(on_press=lambda btn, c=cards, n=name: self.start_reading(c, n))
+            cards_grid.add_widget(card_button)
 
-        self.main_layout.add_widget(spreads_layout)
+        container.add_widget(cards_grid)
+        self.main_layout.add_widget(container)
 
-        # Add some bottom spacing
-        spacer = Label(text="", size_hint_y=0.1)
-        self.main_layout.add_widget(spacer)
-
-    def draw_and_display_spread(self, num_cards, spread_name):
-        """Set up the spread display with proper card rotation."""
-        Logger.info(f"TarotApp: Drawing spread: {spread_name} with {num_cards} cards")
-        self.main_layout.clear_widgets()
-
-        # Title
-        title = Label(
-            text=f"{spread_name} - Card 1 of {num_cards}",
-            font_size='20sp',
-            size_hint_y=0.1,
-            color=(1, 1, 1, 1)
-        )
-        self.main_layout.add_widget(title)
-
-        # Store the title for updating
-        self.current_title = title
-        self.spread_name = spread_name
-        self.num_cards = num_cards
-
-        # Create a simple layout for the current card
-        card_area = BoxLayout(
-            orientation='vertical', 
-            spacing=10, 
-            padding=20,
-            size_hint_y=0.7
-        )
-
-        # Initialize card data
-        self.cards_to_draw = random.sample(tarot_cards, num_cards)
-        self.orientations = [random.choice(["Upright", "Reversed"]) for _ in range(num_cards)]
-        self.current_card_index = 0
-        self.revealed_cards = [False] * num_cards
-
-        # Create the main card image using our rotatable image
-        card_back_path = self.get_card_back_path()
-        self.current_card_image = RotatedTarotImage(
-            source=card_back_path or '',
-            allow_stretch=True,
-            keep_ratio=True,
-            size_hint=(1, 0.8)
-        )
+    def start_reading(self, num_cards, spread_name):
+        """Start a tarot reading"""
+        Logger.info(f"TarotApp: Starting {spread_name} reading with {num_cards} cards")
         
-        # Card info label
-        self.card_info_label = Label(
-            text="Tap card to reveal",
-            font_size='16sp',
-            color=(1, 1, 1, 1),
-            size_hint_y=0.2,
+        # Draw cards and orientations
+        self.current_cards = random.sample(tarot_cards, num_cards)
+        self.current_orientations = [random.choice(["Upright", "Reversed"]) for _ in range(num_cards)]
+        self.current_spread_name = spread_name
+        self.card_index = 0
+        
+        self.show_card()
+
+    def show_card(self):
+        """Display the current card cleanly"""
+        self.main_layout.clear_widgets()
+        
+        # Get current card info
+        card_name = self.current_cards[self.card_index]
+        orientation = self.current_orientations[self.card_index]
+        
+        # Main container
+        container = BoxLayout(
+            orientation='vertical',
+            padding=40,
+            spacing=20,
+            size_hint=(0.95, 0.95),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5}
+        )
+
+        # Spread info (small, at top)
+        info_text = f"{self.current_spread_name} • Card {self.card_index + 1} of {len(self.current_cards)}"
+        info_label = Label(
+            text=info_text,
+            font_size='14sp',
+            color=(0.7, 0.7, 0.7, 1),
+            size_hint_y=0.08,
             halign='center'
         )
+        container.add_widget(info_label)
+
+        # Get card image path
+        card_back_path = self.get_card_back_path()
         
-        card_area.add_widget(self.current_card_image)
-        card_area.add_widget(self.card_info_label)
-        self.main_layout.add_widget(card_area)
-
-        # Bind touch event to reveal card
-        self.current_card_image.bind(on_touch_down=self.on_card_touch)
-
-        # Navigation and control buttons
-        button_layout = BoxLayout(
-            orientation='horizontal', 
-            spacing=10,
-            size_hint_y=0.15
+        # Create the tarot card (this will be the main button)
+        self.current_card_widget = TarotCardImage(
+            card_name=card_name,
+            orientation=orientation,
+            source=card_back_path,
+            allow_stretch=True,
+            keep_ratio=True,
+            size_hint=(1, 0.84)
         )
-
-        # Previous card button
-        prev_button = Button(
-            text="← Previous",
-            background_color=(0.4, 0.4, 0.4, 1),
-            disabled=True  # Disabled on first card
-        )
-        prev_button.bind(on_press=self.show_previous_card)
-        self.prev_button = prev_button
-
-        # Next card button
-        next_button = Button(
-            text="Next →",
-            background_color=(0.4, 0.4, 0.4, 1),
-            disabled=(num_cards == 1)  # Disabled if only one card
-        )
-        next_button.bind(on_press=self.show_next_card)
-        self.next_button = next_button
-
-        # Back to menu button
-        back_button = Button(
-            text="Back to Menu",
-            background_color=(0.6, 0.2, 0.2, 1)
-        )
-        back_button.bind(on_press=lambda btn: self.show_spread_selection())
-
-        button_layout.add_widget(prev_button)
-        button_layout.add_widget(back_button)
-        button_layout.add_widget(next_button)
         
-        self.main_layout.add_widget(button_layout)
-
-        # Update the display for the current card
-        self.update_card_display()
-
-    def update_card_display(self):
-        """Update the display for the current card with proper rotation"""
-        card_num = self.current_card_index + 1
-        self.current_title.text = f"{self.spread_name} - Card {card_num} of {self.num_cards}"
+        # Bind the card tap
+        self.current_card_widget.bind(on_press=self.reveal_card)
         
-        # Update navigation buttons
-        self.prev_button.disabled = (self.current_card_index == 0)
-        self.next_button.disabled = (self.current_card_index >= self.num_cards - 1)
-        
-        # Show the appropriate card state
-        if self.revealed_cards[self.current_card_index]:
-            # Show revealed card
-            card_name = self.cards_to_draw[self.current_card_index]
-            orientation = self.orientations[self.current_card_index]
+        container.add_widget(self.current_card_widget)
+
+        # Instructions (small, at bottom)
+        instruction_label = Label(
+            text="Tap the card to reveal",
+            font_size='16sp',
+            color=(0.8, 0.8, 0.8, 1),
+            size_hint_y=0.08,
+            halign='center'
+        )
+        container.add_widget(instruction_label)
+
+        self.main_layout.add_widget(container)
+
+    def reveal_card(self, instance):
+        """Reveal the current card"""
+        if instance.is_revealed:
+            # If already revealed, go to next card or back to menu
+            self.next_card_or_menu()
+            return
             
-            image_source, is_missing = self.get_card_image_path(card_name, "Upright")
-            if image_source and os.path.exists(image_source):
-                self.current_card_image.source = image_source
-                
-                # Apply rotation after a short delay to ensure image is loaded
-                def apply_rotation(dt):
-                    if orientation == "Reversed":
-                        self.current_card_image.set_rotation(180)
-                        Logger.info(f"TarotApp: Applied 180° rotation to {card_name}")
-                    else:
-                        self.current_card_image.set_rotation(0)
-                
-                Clock.schedule_once(apply_rotation, 0.2)
+        Logger.info(f"TarotApp: Revealing {instance.card_name} ({instance.orientation})")
+        
+        # Get the actual card image
+        card_image_path = self.get_card_image_path(instance.card_name)
+        
+        if card_image_path and os.path.exists(card_image_path):
+            instance.source = card_image_path
+            instance.is_revealed = True
             
-            # Update label
-            orientation_text = "↑ Upright" if orientation == "Upright" else "↓ Reversed"
-            self.card_info_label.text = f"{card_name}\n{orientation_text}"
-            
+            # Update instruction text
+            for child in self.main_layout.children:
+                if isinstance(child, BoxLayout):
+                    for subchild in child.children:
+                        if isinstance(subchild, Label) and "Tap the card" in subchild.text:
+                            card_text = f"{instance.card_name}"
+                            orientation_text = f"({instance.orientation})"
+                            if self.card_index + 1 < len(self.current_cards):
+                                next_text = "Tap for next card"
+                            else:
+                                next_text = "Tap to return to menu"
+                            subchild.text = f"{card_text}\n{orientation_text}\n\n{next_text}"
+                            break
+
+    def next_card_or_menu(self):
+        """Move to next card or return to menu"""
+        self.card_index += 1
+        
+        if self.card_index >= len(self.current_cards):
+            # All cards shown, return to menu
+            self.show_card_menu()
         else:
-            # Show card back
-            card_back_path = self.get_card_back_path()
-            if card_back_path:
-                self.current_card_image.source = card_back_path
-                self.current_card_image.set_rotation(0)  # Always show card backs upright
-            self.card_info_label.text = "Tap card to reveal"
-
-    def show_previous_card(self, instance):
-        """Navigate to the previous card"""
-        if self.current_card_index > 0:
-            self.current_card_index -= 1
-            self.update_card_display()
-
-    def show_next_card(self, instance):
-        """Navigate to the next card"""
-        if self.current_card_index < self.num_cards - 1:
-            self.current_card_index += 1
-            self.update_card_display()
-
-    def on_card_touch(self, instance, touch):
-        """Handles the tap on a card image to reveal it with rotation"""
-        # Check if the touch is within the widget's bounds
-        if not instance.collide_point(*touch.pos):
-            return False
-        
-        # Only reveal if not already revealed
-        if not self.revealed_cards[self.current_card_index]:
-            Logger.info(f"TarotApp: Revealing card {self.current_card_index}")
-            self.revealed_cards[self.current_card_index] = True
-            
-            # Update display with rotation
-            self.update_card_display()
-            
-        return True  # Consume the touch event
+            # Show next card
+            self.show_card()
 
 
 if __name__ == '__main__':
