@@ -162,32 +162,36 @@ class TarotCardImage(AnimatedButton, Image):
                 pass
 
 
-class MysticalButton(AnimatedButton):
-    """Mystical-themed button with gradient background"""
-    def __init__(self, text, **kwargs):
-        super().__init__(**kwargs)
+class MysticalButton(Button):
+    """Mystical-themed button with proper text display"""
+    def __init__(self, text="", **kwargs):
+        # Set default styling
+        kwargs.setdefault('background_color', (0.2, 0.1, 0.4, 0.9))
+        kwargs.setdefault('color', (1, 1, 1, 1))
+        kwargs.setdefault('font_size', '16sp')
+        kwargs.setdefault('bold', True)
         
-        # Gradient background
+        super().__init__(text=text, **kwargs)
+        
+        # Add mystical border effect
         with self.canvas.before:
-            Color(0.2, 0.1, 0.4, 0.8)  # Purple
-            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
-            
-        self.bind(pos=self._update_bg, size=self._update_bg)
+            Color(0.4, 0.2, 0.6, 0.8)
+            self.border = Rectangle(pos=self.pos, size=self.size)
         
-        # Text label
-        self.label = Label(
-            text=text,
-            font_size='16sp',
-            bold=True,
-            color=(1, 1, 1, 1),
-            outline_color=(0.3, 0.1, 0.5, 1),
-            outline_width=1
-        )
-        self.add_widget(self.label)
+        with self.canvas.after:
+            Color(0.15, 0.05, 0.25, 0.9)
+            self.inner_rect = Rectangle(
+                pos=(self.x + 2, self.y + 2), 
+                size=(self.width - 4, self.height - 4)
+            )
+        
+        self.bind(pos=self._update_graphics, size=self._update_graphics)
     
-    def _update_bg(self, *args):
-        self.bg_rect.pos = self.pos
-        self.bg_rect.size = self.size
+    def _update_graphics(self, *args):
+        self.border.pos = self.pos
+        self.border.size = self.size
+        self.inner_rect.pos = (self.x + 2, self.y + 2)
+        self.inner_rect.size = (self.width - 4, self.height - 4)
 
 
 class ReadingHistoryManager:
@@ -386,14 +390,12 @@ class PictureTarotApp(App):
         ]
 
         for text, callback, enabled in menu_options:
-            btn = MysticalButton(
-                text=text if enabled else f"{text} (Done Today)" if "Daily" in text else text,
-                size_hint_y=0.15
-            )
+            display_text = text if enabled else f"{text} (Done Today)" if "Daily" in text else text
+            btn = MysticalButton(display_text, size_hint_y=0.15)
             if enabled:
                 btn.bind(on_press=callback)
             else:
-                btn.label.color = (0.5, 0.5, 0.5, 1)
+                btn.color = (0.5, 0.5, 0.5, 1)
             container.add_widget(btn)
 
         self.main_layout.add_widget(container)
