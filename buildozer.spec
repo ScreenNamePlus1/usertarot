@@ -1,6 +1,6 @@
 [app]
-title = Tarot with Pictures
-package.name = tarotapp
+title = Custom Art Tarot
+package.name = pictarotapp
 package.domain = org.example
 version = 1.0
 requirements = hostpython3, libffi, openssl, sdl2_image, sdl2_mixer, sdl2_ttf, sqlite3, python3, sdl2, setuptools, six, pyjnius, android, kivy, urllib3, idna, certifi, chardet, requests
